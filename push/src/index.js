@@ -76,9 +76,17 @@ async function prices(syms) {
   return out;
 }
 
-export function isDue(p, h, day) {
-  if (p.app === 'cuzdan') return p.hour === h && (p.dates || []).includes(day);
-  return ['sum', 'morn', 'mid'].some(t => p.on?.[t] && p[t] === h);
+// h: İstanbul saati, mi: dakika, day: YYYY-MM-DD, keys: son 5 dakikanın 'YYYY-MM-DDTHH:MM' anahtarları
+export function isDue(p, h, day, mi = 0, keys = []) {
+  const top = mi < 5; // saat başı bildirimleri sadece saatin ilk tetiklemesinde
+  if (p.app === 'cuzdan') return top && p.hour === h && (p.dates || []).includes(day);
+  if (top && ['sum', 'morn', 'mid'].some(t => p.on?.[t] && p[t] === h)) return true;
+  return Array.isArray(p.pt) && p.pt.some(x => keys.includes(x));
+}
+function windowKeys(local) { // local: İstanbul saatine kaydırılmış Date (UTC alanları yerel saati gösterir)
+  const out = [];
+  for (let i = 0; i < 5; i++) { const d = new Date(local.getTime() - i * 60000); out.push(d.toISOString().slice(0, 16)); }
+  return out;
 }
 
 export default {
@@ -118,7 +126,8 @@ export default {
       const hour = v => (Number.isInteger(v) && v >= 0 && v < 24 ? v : null);
       const prefs = p.app === 'cuzdan'
         ? { app: 'cuzdan', hour: hour(p.hour) ?? 10, dates: (Array.isArray(p.dates) ? p.dates : []).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).slice(0, 120) }
-        : { sum: hour(p.sum) ?? 22, morn: hour(p.morn) ?? 9, mid: hour(p.mid) ?? 16, on: { sum: !!p.on?.sum, morn: !!p.on?.morn, mid: !!p.on?.mid } };
+        : { sum: hour(p.sum) ?? 22, morn: hour(p.morn) ?? 9, mid: hour(p.mid) ?? 16, on: { sum: !!p.on?.sum, morn: !!p.on?.morn, mid: !!p.on?.mid },
+            pt: (Array.isArray(p.pt) ? p.pt : []).filter(x => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(x)).slice(0, 120) };
       await env.SUBS.put(await keyOf(sub.endpoint), JSON.stringify({ sub: { endpoint: sub.endpoint, keys: sub.keys }, prefs, at: Date.now() }));
       return json({ ok: true }, 200, o);
     }
@@ -151,7 +160,7 @@ export default {
 
   async scheduled(event, env) {
     const local = new Date(event.scheduledTime + TZ_OFFSET * 3600 * 1000);
-    const h = local.getUTCHours(), day = local.toISOString().slice(0, 10);
+    const h = local.getUTCHours(), mi = local.getUTCMinutes(), day = local.toISOString().slice(0, 10), keys = windowKeys(local);
     let cursor;
     do {
       const list = await env.SUBS.list({ cursor });
@@ -160,7 +169,7 @@ export default {
         const rec = await env.SUBS.get(k.name, 'json');
         if (!rec) continue;
         const p = rec.prefs || {};
-        if (!isDue(p, h, day)) continue;
+        if (!isDue(p, h, day, mi, keys)) continue;
         const r = await sendPush(rec.sub, env);
         console.log('push', h, r.status);
         if (r.status === 404 || r.status === 410) await env.SUBS.delete(k.name);

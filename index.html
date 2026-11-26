@@ -194,6 +194,11 @@ h2{font-size:17px;margin:22px 0 10px}
 .pchips button{flex:1;background:var(--bg);border-radius:12px;padding:9px 0;font-size:12.5px;font-weight:700;color:var(--text)}
 .pchips button.on{background:var(--good);color:#fff}
 .pchips button.wait{opacity:.45}
+.pstreak{font-size:13px;color:var(--muted);margin-top:10px}
+.pstreak b{color:var(--accent)}
+.pheat{margin-top:8px}
+.pq{margin:12px 0 0;font-size:13.5px;line-height:1.45;font-style:italic}
+.pq small{display:block;font-style:normal;color:var(--muted);font-size:12px;margin-top:4px}
 /* tabs */
 nav{position:fixed;left:0;right:0;bottom:0;z-index:5;background:color-mix(in srgb,var(--card) 88%,transparent);
   backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--line);
@@ -295,7 +300,9 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:25;width:100%;heigh
     <h2>🕌 Namaz vakitleri</h2>
     <div class="card"><div class="nrow"><span>Bugün sekmesinde göster</span><button class="tgl" id="pOn" aria-label="Namaz vakitleri"></button></div>
       <div class="nrow"><span>Şehir</span><select id="pCity"></select></div>
-      <div class="nrow"><span>İlçe</span><select id="pIlce"></select></div></div>
+      <div class="nrow"><span>İlçe</span><select id="pIlce"></select></div>
+      <div class="nrow"><span>🔔 Vakit girince bildir</span><button class="tgl" id="pNotif" aria-label="Vakit bildirimi"></button></div>
+      <div class="nrow"><span>⏰ Vakit çıkmadan 30 dk önce hatırlat</span><button class="tgl" id="pPre" aria-label="Vakit hatırlatma"></button></div></div>
     <p class="nstatus" id="pStatus" style="margin-top:8px"></p>
     <div class="btnrow"><button id="pRefresh">Vakitleri yenile</button></div>
     <h2>Son 7 gün</h2>
@@ -410,7 +417,11 @@ const BADGES = [
  ["l5","⭐","Seviye 5", s=>levelOf(s.xp).lvl>=5],
  ["l10","👑","Seviye 10", s=>levelOf(s.xp).lvl>=10],
  ["day5","🚀","Bir günde 5 görev", s=>Object.values(s.log).some(d=>(d.t||0)>=5)],
- ["ice","🧊","İlk dondurucu", s=>(s.spent||0)>0]
+ ["ice","🧊","İlk dondurucu", s=>(s.spent||0)>0],
+ ["pr1","🕌","İlk 5 vakit", s=>prayerFullDays(s)>=1],
+ ["pr7","📿","7 gün 5 vakit", s=>((s.prayer||{}).best||0)>=7],
+ ["pr40","🌙","40 gün 5 vakit", s=>((s.prayer||{}).best||0)>=40],
+ ["pr100","🕋","100 vakit", s=>prayerTotal(s)>=100]
 ];
 
 // ---------- state ----------
@@ -456,8 +467,13 @@ function renderTop(){
 }
 
 // ---------- quote ----------
+function pickQuote(){
+  const rec=S.qRecent||[]; let i, n=0;
+  do{ i=Math.floor(Math.random()*QUOTES.length); }while(rec.includes(i) && ++n<60);
+  S.q=i; S.qRecent=[i,...rec].slice(0,10);
+}
 function showQuote(next){
-  if(next || S.qDay!==today()){ S.q = Math.floor(Math.random()*QUOTES.length); S.qDay=today(); save(); }
+  if(next){ pickQuote(); save(); }
   const [t,a] = QUOTES[S.q % QUOTES.length];
   $('#qText').textContent = '“'+t+'”'; $('#qAuth').textContent = a==='—'?'':'— '+a;
 }
@@ -681,7 +697,7 @@ $('#openSum').onclick = openSummary;
 const PUSH_URL = 'https://motive-push.giveasolace.workers.dev';
 const VAPID_PUBLIC = 'BDMdAzvj94MzI0-fdgNqQo2l1xFBlVZwofnCFR-s7VGeC691tq6rC4GgPykihlS6JHeDCmz10boJzT9p6pbDpck';
 const NT = [['morn','☀️ Sabah planı'],['mid','🔥 Alışkanlık hatırlatma'],['sum','🌙 Günün özeti']];
-const prefs = () => ({sum:S.notif.sum, morn:S.notif.morn, mid:S.notif.mid, on:S.notif.on});
+const prefs = () => ({sum:S.notif.sum, morn:S.notif.morn, mid:S.notif.mid, on:S.notif.on, pr:S.notif.pr||{}, pt:prayerPushTimes()});
 const pushOK = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 const isOn = () => S.notif.subscribed && pushOK() && Notification.permission==='granted';
 function renderNotif(){
@@ -737,7 +753,8 @@ async function writeSnap(){
       plan[k]={n:ts.length, first:ts[0]?ts[0].text:'', r:S.routines.filter(r=>routineOn(r,dd)).map(r=>r.text).concat(S.habits.map(h=>h.name))}; }
     const snap={date:t, total:v.length, done:v.length-und.length, first:und[0]?und[0].text:'', carry:S.tasks.filter(x=>!x.done && !isAuto(x) && x.day<t).length,
       hTotal:goodHabits().length, hPending:goodHabits().filter(h=>!h.days[t]).length,
-      aTotal:avoids().length, aClean:avoids().filter(h=>h.days[t]).length, m:d.m||0, x:d.x||0, plan, notif:prefs(), testAt:S.testAt||0};
+      aTotal:avoids().length, aClean:avoids().filter(h=>h.days[t]).length, m:d.m||0, x:d.x||0, plan, notif:prefs(), testAt:S.testAt||0,
+      pdays:{[t]:S.prayer.days[t]||null, [dkey(addDays(new Date(),1))]:S.prayer.days[dkey(addDays(new Date(),1))]||null}, pdone:Object.keys(S.prayer.done[t]||{}), pstreak:prayerStreak(), pon:S.prayer.on};
     const db=await idb();
     await new Promise((res,rej)=>{ const tx=db.transaction('kv','readwrite'); tx.objectStore('kv').put(snap,'snap'); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); });
     db.close();
@@ -748,10 +765,42 @@ async function writeSnap(){
 const EZAN='https://ezanvakti.emushaf.net';
 const PV=[['imsak','İmsak'],['gunes','Güneş'],['ogle','Öğle'],['ikindi','İkindi'],['aksam','Akşam'],['yatsi','Yatsı']];
 const PV_TO={imsak:"İmsak'a", gunes:"Güneş'e", ogle:"Öğle'ye", ikindi:"İkindi'ye", aksam:"Akşam'a", yatsi:"Yatsı'ya"};
-const PN=[['sabah','Sabah','imsak'],['ogle','Öğle','ogle'],['ikindi','İkindi','ikindi'],['aksam','Akşam','aksam'],['yatsi','Yatsı','yatsi']];
+// [anahtar, ad, vaktin girdiği an, vaktin çıktığı an]
+const PN=[['sabah','Sabah','imsak','gunes'],['ogle','Öğle','ogle','ikindi'],['ikindi','İkindi','ikindi','aksam'],['aksam','Akşam','aksam','yatsi'],['yatsi','Yatsı','yatsi',null]];
+const PRAYER_QUOTES=[
+ ['Şüphesiz namaz, hayâsızlıktan ve kötülükten alıkoyar.','Ankebût, 45'],
+ ['Sabır ve namaz ile Allah\'tan yardım dileyin.','Bakara, 45'],
+ ['Kalpler ancak Allah\'ı anmakla huzur bulur.','Ra\'d, 28'],
+ ['Namazları ve orta namazı koruyun.','Bakara, 238'],
+ ['Beni anmak için namaz kıl.','Tâhâ, 14'],
+ ['Şüphesiz namaz, müminlere vakitleri belirli bir farz olarak yazılmıştır.','Nisâ, 103'],
+ ['Gündüzün iki ucunda ve gecenin gündüze yakın saatlerinde namaz kıl. Şüphesiz iyilikler kötülükleri giderir.','Hûd, 114'],
+ ['Ailene namazı emret, kendin de ona sabırla devam et.','Tâhâ, 132'],
+ ['Müminler gerçekten kurtuluşa ermiştir. Onlar namazlarında huşû içindedirler.','Mü\'minûn, 1-2'],
+ ['Secde et ve yaklaş.','Alak, 19'],
+ ['Namazı dosdoğru kılın, zekâtı verin ve rükû edenlerle birlikte rükû edin.','Bakara, 43'],
+ ['Birinizin kapısının önünden bir nehir aksa da her gün beş defa yıkansa, üzerinde kir kalır mı? İşte beş vakit namaz da böyledir; Allah onlarla günahları siler.','Hadis · Buhârî, Müslim'],
+ ['Kıyamet günü kulun ilk hesaba çekileceği ameli namazdır.','Hadis · Tirmizî, Nesâî'],
+ ['Kulun Rabbine en yakın olduğu an secde hâlidir.','Hadis · Müslim'],
+ ['Allah katında amellerin en sevimlisi, vaktinde kılınan namazdır.','Hadis · Buhârî, Müslim'],
+ ['Gözümün nuru namazda kılındı.','Hadis · Nesâî'],
+ ['Ey Bilâl, kalk da namazla bizi rahatlat.','Hadis · Ebû Dâvûd'],
+ ['Cemaatle kılınan namaz, tek başına kılınandan yirmi yedi derece daha faziletlidir.','Hadis · Buhârî, Müslim'],
+ ['Sabah namazını kılan kimse Allah\'ın himayesindedir.','Hadis · Müslim'],
+ ['Beş vakit namaz ve cuma, bir sonraki cumaya kadar arada işlenen küçük günahlara kefarettir.','Hadis · Müslim']
+];
 const hm = s => { const [h,m]=String(s).split(':').map(Number); return h*60+m; };
 const nowMin = () => { const d=new Date(); return d.getHours()*60+d.getMinutes(); };
 let prayerFetching=false, prayerMin=-1, citiesCache=null;
+const pCount = (s, k) => Object.keys(((s.prayer||{}).done||{})[k]||{}).length;
+function prayerStreak(s=S){
+  let n=0, d=new Date(); if(pCount(s,dkey(d))<5) d=addDays(d,-1);
+  while(pCount(s,dkey(d))>=5){ n++; d=addDays(d,-1); }
+  return n;
+}
+function prayerFullDays(s){ return Object.keys((s.prayer||{}).done||{}).filter(k=>pCount(s,k)>=5).length; }
+function prayerTotal(s){ return Object.keys((s.prayer||{}).done||{}).reduce((a,k)=>a+pCount(s,k),0); }
+function pickPQuote(){ const P=S.prayer; let i, n=0; do{ i=Math.floor(Math.random()*PRAYER_QUOTES.length); }while(i===P.q && ++n<20); P.q=i; }
 async function fetchPrayer(force){
   const P=S.prayer; if(!P.on || prayerFetching) return;
   const t=today(), ahead=Object.keys(P.days).filter(k=>k>=t).length;
@@ -765,17 +814,21 @@ async function fetchPrayer(force){
     if(!Object.keys(days).length) throw new Error('empty');
     if(P.ilceFetched!==P.ilce) P.days={};
     const old=dkey(addDays(new Date(),-2)); for(const k in P.days) if(k<old) delete P.days[k];
-    const oldDone=dkey(addDays(new Date(),-60)); for(const k in P.done) if(k<oldDone) delete P.done[k];
-    Object.assign(P.days, days); P.ilceFetched=P.ilce; P.err=false; save(); renderPrayer();
+    const oldDone=dkey(addDays(new Date(),-400)); for(const k in P.done) if(k<oldDone) delete P.done[k];
+    Object.assign(P.days, days); P.ilceFetched=P.ilce; P.err=false; save(); renderPrayer(); syncPush();
     if(force) toast('🕌 Vakitler güncellendi');
   }catch(e){ P.err=true; renderPrayer(); if(force) toast('Vakitler alınamadı (internet?)'); }
   finally{ prayerFetching=false; }
 }
 function nextPrayer(v){
   const m=nowMin();
-  for(const [k,l] of PV) if(hm(v[k])>m) return {k, diff:hm(v[k])-m};
+  for(const [k] of PV) if(hm(v[k])>m) return {k, diff:hm(v[k])-m};
   const tm=S.prayer.days[dkey(addDays(new Date(),1))];
   return tm ? {k:'imsak', diff:hm(tm.imsak)+1440-m} : null;
+}
+function onTimeNow(v, k){ // namaz şu an kendi vakti içinde mi?
+  const p=PN.find(x=>x[0]===k), m=nowMin(), start=hm(v[p[2]]), end=p[3]?hm(v[p[3]]):1440;
+  return m>=start && m<end;
 }
 function renderPrayer(){
   const box=$('#prayerBox'), P=S.prayer; if(!box) return;
@@ -783,35 +836,67 @@ function renderPrayer(){
   box.style.display='';
   const t=today(), v=P.days[t];
   if(!v){ box.innerHTML=`<div class="ph"><b>🕌 Namaz vakitleri · ${esc(P.place)}</b></div><p class="note" style="margin:0">${P.err?'Vakitler alınamadı, internet gelince yenilenecek.':'Vakitler yükleniyor…'}</p>`; return; }
-  const nx=nextPrayer(v), done=P.done[t]||{}, m=nowMin(), n=Object.keys(done).length;
+  const nx=nextPrayer(v), done=P.done[t]||{}, m=nowMin(), n=Object.keys(done).length, st=prayerStreak();
   const dur = d => d>=60 ? `${Math.floor(d/60)} sa ${d%60} dk` : `${d} dk`;
+  let cells=''; for(let i=29;i>=0;i--){ const k=dkey(addDays(new Date(),-i)), c=pCount(S,k); cells+=`<i class="${i===0?'today':''}" style="${c?`background:var(--good);opacity:${(0.25+c*0.15).toFixed(2)}`:''}" title="${k}: ${c}/5"></i>`; }
+  const q=PRAYER_QUOTES[(P.q||0)%PRAYER_QUOTES.length];
   box.innerHTML = `<div class="ph"><b>🕌 ${esc(P.place)} · ${n}/5</b>${nx?`<span>${PV_TO[nx.k]} ${dur(nx.diff)}</span>`:''}</div>
     <div class="ptimes">${PV.map(([k,l])=>`<div class="${nx&&nx.k===k&&hm(v[k])>m?'next':''}"><small>${l}</small><b>${esc(v[k])}</b></div>`).join('')}</div>
-    <div class="pchips">${PN.map(([k,l,tk])=>`<button data-pn="${k}" class="${done[k]?'on':hm(v[tk])>m?'wait':''}" aria-label="${l} namazı">${done[k]?'✓ ':''}${l}</button>`).join('')}</div>`;
+    <div class="pchips">${PN.map(([k,l,tk])=>`<button data-pn="${k}" class="${done[k]?'on':hm(v[tk])>m?'wait':''}" aria-label="${l} namazı">${done[k]?'✓ ':''}${l}${done[k]&&done[k].v?' ⏱':''}</button>`).join('')}</div>
+    <div class="pstreak">${st?`🔥 5 vakit serisi: <b>${st} gün</b>`:'5 vakti tamamla, seri başlasın'}${P.best?` · en iyi ${P.best}`:''}</div>
+    <div class="heat pheat">${cells}</div>
+    <p class="pq">“${esc(q[0])}”<small>${esc(q[1])}</small></p>`;
 }
 function togglePrayer(k){
-  const t=today(), d=(S.prayer.done[t] ||= {});
-  if(d[k]){ delete d[k]; loseXP(5); }
-  else { d[k]=true; buzz(); gainXP(5,'Namaz');
-    if(Object.keys(d).length===5) setTimeout(()=>{ confetti(150); toast('🕌 Bugünün 5 vakti tamam, Allah kabul etsin'); },400); }
-  save(); renderPrayer();
+  const t=today(), P=S.prayer, d=(P.done[t] ||= {}), v=P.days[t];
+  P.bonus ||= {}; P.ms ||= {};
+  if(d[k]){
+    loseXP(d[k].x||5); delete d[k];
+    if(P.bonus[t] && Object.keys(d).length<5){ loseXP(20); delete P.bonus[t]; }
+  } else {
+    const ontime = v ? onTimeNow(v,k) : false, x = ontime ? 7 : 5;
+    d[k]={x, v:ontime}; buzz(); gainXP(x, ontime?'Vaktinde namaz ⏱':'Namaz');
+    if(Object.keys(d).length===5 && !P.bonus[t]){
+      P.bonus[t]=1;
+      const st=prayerStreak(); P.best=Math.max(P.best||0, st);
+      setTimeout(()=>{ confetti(160); gainXP(20,'5 vakit tamam');
+        if([7,21,40].includes(st) && !P.ms[st+':'+t]){ P.ms[st+':'+t]=1; gainXP(50, st+' gün seri'); modal('🕌', `${st} gün 5 vakit!`, `${st} gündür beş vakti aksatmadın. Allah kabul etsin, devam!`); }
+        else toast('🕌 Bugünün 5 vakti tamam, Allah kabul etsin');
+        save(); renderPrayer(); }, 400);
+    }
+  }
+  save(); renderPrayer(); syncPush();
 }
 $('#prayerBox').onclick = e => { const b=e.target.closest('[data-pn]'); if(b) togglePrayer(b.dataset.pn); };
+// ezan bildirimleri için zaman listesi (sadece saatler; önümüzdeki 7 gün)
+function prayerPushTimes(){
+  const P=S.prayer, pr=S.notif.pr||{}; if(!P.on || (!pr.on && !pr.pre)) return [];
+  const out=[], now=new Date(), t=today(), nowK=t+'T'+pad(now.getHours())+':'+pad(now.getMinutes());
+  for(let i=0;i<7;i++){ const k=dkey(addDays(new Date(),i)), v=P.days[k]; if(!v) continue; const done=P.done[k]||{};
+    for(const [pk,,start,end] of PN){
+      if(pr.on) out.push(k+'T'+v[start]);
+      if(pr.pre && end && !done[pk]){ const e=hm(v[end])-30; if(e>hm(v[start])) out.push(k+'T'+pad(Math.floor(e/60))+':'+pad(e%60)); }
+    } }
+  return [...new Set(out)].filter(x=>x>nowK).sort().slice(0,100);
+}
 async function loadIlce(city, sel){
   try{ const l=await (await fetch(`${EZAN}/ilceler/${encodeURIComponent(city)}`)).json();
     $('#pIlce').innerHTML=l.map(x=>`<option value="${x.IlceID}" ${x.IlceID===sel?'selected':''}>${esc(x.IlceAdi)}</option>`).join(''); return l; }
   catch(e){ $('#pIlce').innerHTML=`<option>${esc(S.prayer.place)}</option>`; return []; }
 }
 async function renderPrayerSettings(){
-  const P=S.prayer; $('#pOn').classList.toggle('on',P.on);
-  $('#pStatus').textContent = P.on ? `${P.place} · ${Object.keys(P.days).filter(k=>k>=today()).length} günlük vakit kayıtlı (Diyanet)` : 'Kapalı';
+  const P=S.prayer, pr=S.notif.pr||{}; $('#pOn').classList.toggle('on',P.on);
+  $('#pNotif').classList.toggle('on',!!pr.on); $('#pPre').classList.toggle('on',!!pr.pre);
+  $('#pStatus').textContent = P.on ? `${P.place} · ${Object.keys(P.days).filter(k=>k>=today()).length} günlük vakit kayıtlı (Diyanet)${(pr.on||pr.pre)&&!isOn()?' · bildirimler için yukarıdan "Bildirimleri aç"':''}` : 'Kapalı';
   if(!citiesCache){ try{ citiesCache=await (await fetch(`${EZAN}/sehirler/2`)).json(); }catch(e){ citiesCache=null; } }
   $('#pCity').innerHTML = citiesCache ? citiesCache.map(c=>`<option value="${c.SehirID}" ${c.SehirID===P.city?'selected':''}>${esc(c.SehirAdi)}</option>`).join('') : `<option>${esc(P.place)}</option>`;
   await loadIlce(P.city, P.ilce);
 }
 const titleTr = s => s.split(' ').map(w=>w.charAt(0)+w.slice(1).toLocaleLowerCase('tr')).join(' ');
 function setIlce(id, name){ S.prayer.ilce=id; S.prayer.place=titleTr(name); S.prayer.err=false; save(); renderPrayer(); fetchPrayer(true).then(renderPrayerSettings); }
-$('#pOn').onclick = () => { S.prayer.on=!S.prayer.on; save(); renderPrayer(); renderPrayerSettings(); if(S.prayer.on) fetchPrayer(); };
+$('#pOn').onclick = () => { S.prayer.on=!S.prayer.on; save(); renderPrayer(); renderPrayerSettings(); if(S.prayer.on) fetchPrayer(); syncPush(); };
+$('#pNotif').onclick = () => { S.notif.pr ||= {}; S.notif.pr.on=!S.notif.pr.on; save(); renderPrayerSettings(); syncPush(); toast(S.notif.pr.on?'🕌 Vakit girince bildirim gelecek':'Vakit bildirimi kapalı'); };
+$('#pPre').onclick = () => { S.notif.pr ||= {}; S.notif.pr.pre=!S.notif.pr.pre; save(); renderPrayerSettings(); syncPush(); toast(S.notif.pr.pre?'⏰ Vakit çıkmadan 30 dk önce hatırlatılacak':'Hatırlatma kapalı'); };
 $('#pCity').onchange = async e => { S.prayer.city=e.target.value; const cname=e.target.selectedOptions[0].text; const l=await loadIlce(S.prayer.city);
   const main=l.find(x=>x.IlceAdi===cname)||l[0]; if(main){ $('#pIlce').value=main.IlceID; setIlce(main.IlceID, main.IlceAdi); } };
 $('#pIlce').onchange = e => setIlce(e.target.value, e.target.selectedOptions[0].text);
@@ -953,7 +1038,10 @@ function tick(){
   const pm=new Date().getMinutes(); if(pm!==prayerMin){ prayerMin=pm; renderPrayer(); }
 }
 setInterval(tick, 500);
-document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ tick(); materializeRoutines(); applyFreezes(); renderAll(); maybeAutoSummary(); fetchPrayer(); } });
+let hiddenAt=0;
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden){ hiddenAt=Date.now(); return; }
+  if(hiddenAt && Date.now()-hiddenAt>120000){ pickQuote(); pickPQuote(); save(); }
+  tick(); materializeRoutines(); applyFreezes(); renderAll(); maybeAutoSummary(); fetchPrayer(); });
 $('#tStart').onclick = () => {
   unlockAudio();
   if(S.timer.running){ S.timer.left=leftNow(); S.timer.running=false; }
@@ -1053,7 +1141,7 @@ async function notify(title, body){
 function renderAll(){ renderTop(); showQuote(); renderTasks(); renderHabits(); renderSeg(); renderTimer(); renderStats(); renderMe(); renderPlan(); renderNotif(); renderPrayer(); }
 // geçmiş: 30 günden eski tamamlanmış görevleri temizle
 const cut = dkey(addDays(new Date(),-30)); S.tasks = S.tasks.filter(t=>!t.done || t.doneOn>=cut); save();
-materializeRoutines(); applyFreezes(); renderAll(); checkBadges();
+pickQuote(); pickPQuote(); materializeRoutines(); applyFreezes(); renderAll(); checkBadges();
 if(new URLSearchParams(location.search).has('ozet')){ history.replaceState(null,'',location.pathname); openSummary(); } else maybeAutoSummary();
 writeSnap(); syncPush(); fetchPrayer();
 if('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e=>{ if(e.data==='ozet') openSummary(); });

@@ -1,4 +1,4 @@
-const CACHE = 'motive-v7';
+const CACHE = 'motive-v8';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -42,6 +42,24 @@ function buildMessage(s) {
   const now = new Date(), h = now.getHours(), t = dkey(now);
   if (s && s.testAt && Date.now() - s.testAt < 5 * 60 * 1000)
     return { title: '✅ Bildirimler çalışıyor!', body: 'Seçtiğin saatlerde burada olacağım 💪', url: './' };
+
+  // Namaz: vakit girdi / vakit çıkmadan hatırlatma
+  const pr = s && s.notif && s.notif.pr;
+  if (s && s.pon && s.pdays && pr && (pr.on || pr.pre) && s.pdays[t]) {
+    const v = s.pdays[t], m = h * 60 + now.getMinutes(), done = s.date === t ? (s.pdone || []) : [];
+    const hmm = x => { const [a, b] = String(x).split(':').map(Number); return a * 60 + b; };
+    const PN = [['sabah', 'Sabah', 'imsak', 'gunes'], ['ogle', 'Öğle', 'ogle', 'ikindi'], ['ikindi', 'İkindi', 'ikindi', 'aksam'], ['aksam', 'Akşam', 'aksam', 'yatsi'], ['yatsi', 'Yatsı', 'yatsi', null]];
+    if (pr.on) for (const [, l, st, en] of PN) {
+      const d = m - hmm(v[st]);
+      if (d >= 0 && d <= 7) return { title: `🕌 ${l} vakti girdi`, body: `${v[st]}${en ? ' – ' + v[en] : ''} · ${s.pstreak ? `5 vakit serin ${s.pstreak} gün, bozma 💪` : 'Haydi, vaktinde kılalım 🤲'}`, url: './' };
+    }
+    if (pr.pre) for (const [k, l, , en] of PN) {
+      if (!en) continue; const left = hmm(v[en]) - m;
+      if (left >= 22 && left <= 38) return done.includes(k)
+        ? { title: `✅ ${l} namazını kıldın`, body: 'Allah kabul etsin 🌿', url: './' }
+        : { title: `⏰ ${l} vaktinin çıkmasına ${left} dk`, body: 'Henüz işaretlemedin. Kıldıysan işaretle, kılmadıysan tam zamanı 🤲', url: './' };
+    }
+  }
 
   const n = (s && s.notif) || { sum: 22, morn: 9, mid: 16, on: { sum: true, morn: true, mid: true } };
   const types = ['morn', 'mid', 'sum'].filter(k => n.on && n.on[k]);
