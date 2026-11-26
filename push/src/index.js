@@ -86,6 +86,15 @@ export default {
     const o = req.headers.get('Origin') || '';
     const path = new URL(req.url).pathname;
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(o) });
+    // Cüzdan gelen kutusu: içerik uçtan uca şifreli; sunucu sadece kodun özetini (id) bilir
+    if (req.method === 'GET' && path === '/inbox') {
+      const id = new URL(req.url).searchParams.get('id') || '';
+      if (!/^[a-f0-9]{24}$/.test(id)) return json({ error: 'bad id' }, 400, o);
+      const l = await env.SUBS.list({ prefix: `inbox:${id}:` });
+      const items = [];
+      for (const k of l.keys.slice(0, 20)) { const v = await env.SUBS.get(k.name); if (v) items.push({ k: k.name, data: v }); }
+      return json({ items }, 200, o);
+    }
     if (req.method === 'GET' && path === '/prices') {
       const syms = [...new Set((new URL(req.url).searchParams.get('s') || '').toUpperCase().split(',').map(x => x.trim()).filter(x => SYM_RE.test(x)))].slice(0, 30);
       if (!syms.length) return json({ error: 'sembol yok' }, 400, o);
@@ -111,6 +120,20 @@ export default {
         ? { app: 'cuzdan', hour: hour(p.hour) ?? 10, dates: (Array.isArray(p.dates) ? p.dates : []).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).slice(0, 120) }
         : { sum: hour(p.sum) ?? 22, morn: hour(p.morn) ?? 9, mid: hour(p.mid) ?? 16, on: { sum: !!p.on?.sum, morn: !!p.on?.morn, mid: !!p.on?.mid } };
       await env.SUBS.put(await keyOf(sub.endpoint), JSON.stringify({ sub: { endpoint: sub.endpoint, keys: sub.keys }, prefs, at: Date.now() }));
+      return json({ ok: true }, 200, o);
+    }
+    if (path === '/inbox') {
+      const id = String(body.id || '');
+      if (!/^[a-f0-9]{24}$/.test(id) || typeof body.data !== 'string' || body.data.length > 400_000) return json({ error: 'bad request' }, 400, o);
+      const n = (await env.SUBS.list({ prefix: `inbox:${id}:` })).keys.length;
+      if (n >= 20) return json({ error: 'inbox full' }, 429, o);
+      await env.SUBS.put(`inbox:${id}:${Date.now()}`, body.data, { expirationTtl: 30 * 86400 });
+      return json({ ok: true }, 200, o);
+    }
+    if (path === '/inbox/ack') {
+      const id = String(body.id || '');
+      if (!/^[a-f0-9]{24}$/.test(id) || !Array.isArray(body.keys)) return json({ error: 'bad request' }, 400, o);
+      for (const k of body.keys.slice(0, 20)) if (typeof k === 'string' && k.startsWith(`inbox:${id}:`)) await env.SUBS.delete(k);
       return json({ ok: true }, 200, o);
     }
     if (path === '/unsubscribe') {
