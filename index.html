@@ -123,6 +123,51 @@ h2{font-size:17px;margin:22px 0 10px}
 .btnrow button,.btnrow label{flex:1;background:var(--card);border-radius:14px;padding:14px;text-align:center;font-weight:600;font-size:14px;box-shadow:var(--shadow);cursor:pointer}
 .danger{color:#e5484d}
 
+
+/* plan / takvim */
+.phead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.pill{background:var(--card);box-shadow:var(--shadow);border-radius:99px;padding:9px 14px;font-weight:700;font-size:14px;white-space:nowrap}
+.cal{padding:10px 10px 12px}
+.calhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.calhead b{font-size:16px}
+.calhead button{font-size:26px;line-height:1;padding:2px 14px;color:var(--accent)}
+.calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+.calgrid .wd{font-size:11px;color:var(--muted);padding:4px 0;font-weight:600}
+.calgrid button{position:relative;aspect-ratio:1;border-radius:12px;font-size:15px;font-weight:600}
+.calgrid button.past{color:var(--muted)}
+.calgrid button.oth{opacity:.3}
+.calgrid button.tod{color:var(--accent);background:var(--soft)}
+.calgrid button.sel{background:var(--accent);color:#fff}
+.calgrid button i{position:absolute;left:50%;bottom:4px;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--accent)}
+.calgrid button.sel i{background:#fff}
+.ghostrow{opacity:.55}
+.chk.dash{border-style:dashed}
+/* sheet */
+.sheetwrap{place-items:end center;padding:0}
+.sheet{background:var(--bg);width:100%;max-width:560px;max-height:90vh;overflow:auto;-webkit-overflow-scrolling:touch;border-radius:24px 24px 0 0;padding:16px 16px calc(env(safe-area-inset-bottom) + 24px);animation:up .3s ease}
+@keyframes up{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+.sh-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.sh-head h3{margin:0;font-size:22px}
+.sh-head button{font-size:16px;color:var(--muted);background:var(--card);width:34px;height:34px;border-radius:50%}
+.chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:-4px 0 14px}
+.chips button{background:var(--card);border-radius:10px;padding:7px 10px;font-size:13px;font-weight:600;box-shadow:var(--shadow)}
+.chips button.on{background:var(--accent);color:#fff}
+.chipnote{font-size:12px;color:var(--muted);margin-left:4px}
+.tgl{width:46px;height:28px;border-radius:99px;background:var(--line);position:relative;flex:none;transition:.2s}
+.tgl::after{content:"";position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.tgl.on{background:var(--good)}
+.tgl.on::after{left:21px}
+.sumhero{text-align:center;padding:4px 0 16px}
+.sumhero .em{font-size:56px}
+.sumhero p{font-weight:700;font-size:17px;margin:6px 0 0}
+.stats + .stats{margin-top:10px}
+.mv{background:var(--soft);color:var(--accent);border-radius:10px;padding:7px 10px;font-size:13px;font-weight:700;white-space:nowrap}
+.wide{width:100%;margin-top:14px;display:block}
+.nrow{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.nrow:last-child{border-bottom:0}
+.nrow span{flex:1;font-weight:600;font-size:15px}
+.nrow select{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:6px 8px;font-size:15px}
+.nstatus{font-size:14px;color:var(--muted);margin:0 0 10px;line-height:1.45}
 /* tabs */
 nav{position:fixed;left:0;right:0;bottom:0;z-index:5;background:color-mix(in srgb,var(--card) 88%,transparent);
   backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--line);
@@ -166,6 +211,16 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:25;width:100%;heigh
     <div class="card" id="taskList"></div>
   </section>
 
+  <!-- PLAN -->
+  <section class="view" id="v-plan">
+    <div class="phead"><h1>Plan</h1><button class="pill" id="openRoutines">🔁 Rutinler</button></div>
+    <p class="sub">Günü seç, görevlerini önceden planla.</p>
+    <div class="card cal"><div class="calhead"><button id="calPrev" aria-label="Önceki ay">‹</button><b id="calTitle"></b><button id="calNext" aria-label="Sonraki ay">›</button></div><div class="calgrid" id="calGrid"></div></div>
+    <h2 id="selTitle"></h2>
+    <form class="add" id="planForm"><input id="planIn" placeholder="Bu güne görev ekle" autocomplete="off" enterkeyhint="done"><button aria-label="Ekle">+</button></form>
+    <div class="card" id="planList"></div>
+  </section>
+
   <!-- ALIŞKANLIK -->
   <section class="view" id="v-habits">
     <h1>Alışkanlıklar</h1>
@@ -201,6 +256,11 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:25;width:100%;heigh
   <section class="view" id="v-me">
     <h1>Profil</h1>
     <p class="sub" id="meSub"></p>
+    <div class="btnrow"><button id="openSum">🌙 Bugünün özeti</button></div>
+    <h2>Bildirimler</h2>
+    <p class="nstatus" id="nStatus"></p>
+    <div class="card" id="nRows"></div>
+    <div class="btnrow" style="margin-top:10px"><button id="nOn">🔔 Bildirimleri aç</button><button id="nTest">Test gönder</button></div>
     <h2>Son 7 gün</h2>
     <div class="card chart">
       <div class="legend"><span><i style="background:var(--accent)"></i>Görev</span><span><i style="background:var(--good)"></i>Odak (dk)</span></div>
@@ -220,12 +280,14 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:25;width:100%;heigh
 
 <nav id="tabs">
   <button data-v="today" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg>Bugün</button>
+  <button data-v="plan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Plan</button>
   <button data-v="habits"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2c1 4 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-6 1-9z"/></svg>Alışkanlık</button>
   <button data-v="focus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg>Odak</button>
   <button data-v="me"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>Profil</button>
 </nav>
 
 <div class="toast" id="toast"></div>
+<div class="modal sheetwrap" id="sheet"><div class="sheet"><div class="sh-head"><h3 id="shTitle"></h3><button id="shClose" aria-label="Kapat">✕</button></div><div id="shBody"></div></div></div>
 <div class="modal" id="modal"><div class="box"><div class="em" id="mEm">🎉</div><h3 id="mTitle"></h3><p id="mText"></p><button class="big" id="mOk">Devam!</button></div></div>
 <canvas id="fx"></canvas>
 
@@ -319,11 +381,14 @@ const defaults = () => ({
   xp:0, tasks:[], habits:[], log:{}, // log[date] = {t:tasksDone, m:focusMin, p:pomos}
   stats:{tasks:0,pomos:0}, badges:[], bonus:{},
   spent:0, freezes:0, frozen:{}, freezeChecked:null,
+  routines:[], rskip:{}, sumShown:null, testAt:0,
+  notif:{sum:22, morn:9, mid:16, on:{sum:true, morn:true, mid:true}, subscribed:false},
   focus:{work:25,brk:5}, timer:{mode:'work',running:false,endAt:0,left:25*60}, q:0
 });
 let S;
 try { S = Object.assign(defaults(), JSON.parse(localStorage.getItem(KEY)||'{}')); } catch(e){ S = defaults(); }
-const save = () => { try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} };
+const save = () => { try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} queueSnap(); };
+var snapT; function queueSnap(){ clearTimeout(snapT); snapT=setTimeout(writeSnap,300); }
 
 const pad = n => String(n).padStart(2,'0');
 const dkey = (d=new Date()) => d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
@@ -338,6 +403,7 @@ function levelOf(xp){ let lvl=1, need=100, base=0; while(xp>=base+need){ base+=n
 function gainXP(n, why){
   const before = levelOf(S.xp).lvl;
   S.xp = Math.max(0, S.xp+n);
+  const dl = dayLog(); dl.x = (dl.x||0) + n;
   const after = levelOf(S.xp).lvl;
   if(n>0) toast(`+${n} XP${why?' · '+why:''}`);
   save(); renderTop(); checkBadges();
@@ -360,39 +426,248 @@ function showQuote(next){
 $('#qNext').onclick = () => showQuote(true);
 
 // ---------- tasks ----------
+const tomorrow = () => dkey(addDays(new Date(),1));
+function loseXP(n){ S.xp=Math.max(0,S.xp-n); const d=dayLog(); d.x=(d.x||0)-n; save(); renderTop(); }
+function undoTaskXP(t){ const l=dayLog(t.doneOn); l.t--; l.x=(l.x||0)-10; S.stats.tasks--; S.xp=Math.max(0,S.xp-10); }
 function visibleTasks(){
   const t = today();
-  return S.tasks.filter(x => !x.done || x.doneOn===t);
+  return S.tasks.filter(x => x.done ? x.doneOn===t : x.day<=t);
+}
+const sortT = (a,b)=>(a.done-b.done)||((a.rid?1:0)-(b.rid?1:0))||(a.created-b.created);
+function rowHTML(x){
+  const late = !x.done && !x.rid && x.day<today();
+  const tag = late ? `<span class="tag">${x.day===dkey(addDays(new Date(),-1))?'DÜNDEN':'GECİKMİŞ'}</span>` : '';
+  return `<div class="row ${x.done?'done':''}" data-id="${x.id}">
+    <button class="chk ${x.done?'on':''}" data-a="tog" aria-label="Tamamla"></button>
+    <div class="t">${x.rid?'🔁 ':''}${esc(x.text)}${tag}</div>
+    <button class="x" data-a="del" aria-label="Sil">×</button></div>`;
 }
 function renderTasks(){
   const h = new Date().getHours();
   $('#greet').textContent = h<6?'İyi geceler':h<12?'Günaydın':h<18?'İyi günler':'İyi akşamlar';
-  const list = visibleTasks().sort((a,b)=>(a.done-b.done)||(a.created-b.created));
+  const list = visibleTasks().sort(sortT);
   const done = list.filter(x=>x.done).length;
   $('#todaySub').textContent = list.length ? `${done}/${list.length} tamamlandı${done===list.length?' · Harika iş! 🎉':''}` :
     new Date().toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long'});
-  $('#taskList').innerHTML = list.length ? list.map(x=>`
-    <div class="row ${x.done?'done':''}" data-id="${x.id}">
-      <button class="chk ${x.done?'on':''}" data-a="tog" aria-label="Tamamla"></button>
-      <div class="t">${esc(x.text)}${!x.done && x.day!==today()?'<span class="tag">DÜNDEN</span>':''}</div>
-      <button class="x" data-a="del" aria-label="Sil">×</button>
-    </div>`).join('') : `<div class="empty">Henüz görev yok.<br>Bugün bitireceğin <b>tek bir şey</b> yazarak başla.</div>`;
+  $('#taskList').innerHTML = list.length ? list.map(rowHTML).join('') : `<div class="empty">Henüz görev yok.<br>Bugün bitireceğin <b>tek bir şey</b> yazarak başla.</div>`;
 }
+function refreshLists(){ renderTasks(); renderPlan(); }
+function addTask(text, day){ S.tasks.push({id:uid(), text, done:false, day, created:Date.now()}); save(); }
 $('#taskForm').onsubmit = e => {
   e.preventDefault(); const v = $('#taskIn').value.trim(); if(!v) return;
-  S.tasks.push({id:uid(), text:v, done:false, day:today(), created:Date.now()});
-  $('#taskIn').value=''; save(); renderTasks();
+  addTask(v, today()); $('#taskIn').value=''; refreshLists();
 };
-$('#taskList').onclick = e => {
+function onTaskClick(e){
   const b = e.target.closest('[data-a]'); if(!b) return;
-  const id = b.closest('.row').dataset.id; const t = S.tasks.find(x=>x.id===id); if(!t) return;
-  if(b.dataset.a==='del'){ S.tasks = S.tasks.filter(x=>x.id!==id); if(t.done){ dayLog(t.doneOn).t--; S.stats.tasks--; S.xp=Math.max(0,S.xp-10);} save(); renderTasks(); renderTop(); return; }
+  const row = b.closest('.row'); if(!row || !row.dataset.id) return;
+  const t = S.tasks.find(x=>x.id===row.dataset.id); if(!t) return;
+  if(b.dataset.a==='del'){
+    S.tasks = S.tasks.filter(x=>x!==t);
+    if(t.rid) S.rskip[t.rid+':'+t.day]=1;
+    if(t.done) undoTaskXP(t);
+    save(); renderTop(); refreshLists(); renderStats(); return;
+  }
+  if(t.day>today()) return toast('Bu görev ileri bir tarih için 📅');
   t.done = !t.done;
   if(t.done){ t.doneOn=today(); dayLog().t++; S.stats.tasks++; buzz(); const r=b.getBoundingClientRect(); confetti(40, r.left+r.width/2, r.top); gainXP(10,'Görev');
     const v = visibleTasks(); if(v.length>1 && v.every(x=>x.done)) setTimeout(()=>{confetti(200); gainXP(20,'Hepsi bitti!');},400);
-  } else { dayLog(t.doneOn).t--; S.stats.tasks--; delete t.doneOn; S.xp=Math.max(0,S.xp-10); save(); renderTop(); }
-  renderTasks(); renderStats();
+  } else { undoTaskXP(t); delete t.doneOn; renderTop(); }
+  save(); refreshLists(); renderStats();
+}
+$('#taskList').onclick = onTaskClick;
+
+// ---------- routines ----------
+const WD = ['Pz','Pt','Sa','Ça','Pe','Cu','Ct']; // getDay() sırası
+const WD_ORDER = [1,2,3,4,5,6,0];
+const routineOn = (r, d) => r.on && (!r.wd || !r.wd.length || r.wd.includes(d.getDay()));
+const wdText = wd => !wd||!wd.length||wd.length===7 ? 'Her gün'
+  : (wd.length===5 && [1,2,3,4,5].every(i=>wd.includes(i))) ? 'Hafta içi'
+  : (wd.length===2 && wd.includes(0) && wd.includes(6)) ? 'Hafta sonu'
+  : WD_ORDER.filter(i=>wd.includes(i)).map(i=>WD[i]).join(', ');
+function materializeRoutines(){
+  const t = today(), now = new Date();
+  // dünden kalan yapılmamış rutinler birikmesin
+  S.tasks = S.tasks.filter(x => !(x.rid && !x.done && x.day<t));
+  for(const r of S.routines){
+    if(!routineOn(r,now) || S.rskip[r.id+':'+t]) continue;
+    if(!S.tasks.some(x=>x.rid===r.id && x.day===t)) S.tasks.push({id:uid(), text:r.text, rid:r.id, done:false, day:t, created:Date.now()});
+  }
+  // kapatılan/silinen rutinlerin bugünkü yapılmamış görevlerini kaldır
+  S.tasks = S.tasks.filter(x => !(x.rid && !x.done && x.day===t && !S.routines.some(r=>r.id===x.rid && routineOn(r,now))));
+  for(const k in S.rskip) if(k.split(':')[1]<t) delete S.rskip[k];
+  save();
+}
+let newWd = [];
+function routinesHTML(){
+  return `<p class="sub">Buraya eklediğin görevler seçtiğin günlerde <b>Bugün</b> listene kendiliğinden gelir.</p>
+  <form class="add" id="rForm"><input id="rIn" placeholder="Örn: Mailleri kontrol et" autocomplete="off" enterkeyhint="done"><button aria-label="Ekle">+</button></form>
+  <div class="chips">${WD_ORDER.map(i=>`<button type="button" data-wd="${i}" class="${newWd.includes(i)?'on':''}">${WD[i]}</button>`).join('')}<span class="chipnote">${newWd.length?wdText(newWd):'Gün seçmezsen: her gün'}</span></div>
+  <div class="card">${S.routines.length ? S.routines.map(r=>`<div class="row" data-rid="${r.id}">
+     <button class="tgl ${r.on?'on':''}" data-a="ron" aria-label="Aç/Kapat"></button>
+     <div class="t">${esc(r.text)}<div class="streak">${wdText(r.wd)}${r.on?'':' · kapalı'}</div></div>
+     <button class="x" data-a="rdel" aria-label="Sil">×</button></div>`).join('') : '<div class="empty">Henüz rutin yok.<br>Her gün yaptığın işleri ekle, sen uğraşma.</div>'}</div>`;
+}
+function drawRoutines(){
+  const old = $('#rIn') ? $('#rIn').value : '';
+  $('#shBody').innerHTML = routinesHTML(); $('#rIn').value = old;
+  $('#rForm').onsubmit = e => { e.preventDefault(); const v=$('#rIn').value.trim(); if(!v) return;
+    S.routines.push({id:uid(), text:v, wd:[...newWd], on:true}); newWd=[]; $('#rIn').value='';
+    materializeRoutines(); refreshLists(); drawRoutines(); toast('🔁 Rutin eklendi'); };
+}
+function openRoutines(){ newWd=[]; openSheet('🔁 Rutin görevler', '', routinesClick); drawRoutines(); }
+function routinesClick(e){
+  const w = e.target.closest('[data-wd]');
+  if(w){ const i=+w.dataset.wd; newWd = newWd.includes(i) ? newWd.filter(x=>x!==i) : [...newWd,i]; drawRoutines(); return; }
+  const b = e.target.closest('[data-a]'); if(!b) return;
+  const row = b.closest('.row'); const r = row && S.routines.find(x=>x.id===row.dataset.rid); if(!r) return;
+  if(b.dataset.a==='ron') r.on = !r.on;
+  if(b.dataset.a==='rdel'){ if(!confirm(`"${r.text}" rutini silinsin mi?`)) return; S.routines = S.routines.filter(x=>x!==r); }
+  materializeRoutines(); refreshLists(); drawRoutines();
+}
+$('#openRoutines').onclick = openRoutines;
+
+// ---------- plan / takvim ----------
+const MONTHS = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+let calM = new Date(); calM = new Date(calM.getFullYear(), calM.getMonth(), 1); let selDay = today();
+function renderPlan(){
+  const t = today();
+  $('#calTitle').textContent = MONTHS[calM.getMonth()]+' '+calM.getFullYear();
+  const off = (calM.getDay()+6)%7; let d = addDays(calM,-off);
+  const counts = {}; for(const x of S.tasks) if(!x.done && !x.rid) counts[x.day]=(counts[x.day]||0)+1;
+  let h = ['Pt','Sa','Ça','Pe','Cu','Ct','Pz'].map(w=>`<span class="wd">${w}</span>`).join('');
+  for(let i=0;i<42;i++){
+    const k = dkey(d);
+    const cls = [d.getMonth()!==calM.getMonth()?'oth':'', k===t?'tod':'', k===selDay?'sel':'', k<t?'past':''].join(' ');
+    h += `<button class="${cls}" data-d="${k}">${d.getDate()}${counts[k]?'<i></i>':''}</button>`;
+    d = addDays(d,1);
+  }
+  $('#calGrid').innerHTML = h;
+  const sd = new Date(selDay+'T12:00');
+  $('#selTitle').textContent = (selDay===t?'Bugün · ':selDay===tomorrow()?'Yarın · ':'') + sd.toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long'});
+  const list = (selDay===t ? visibleTasks() : S.tasks.filter(x=>x.day===selDay)).sort(sortT);
+  let html = list.map(rowHTML).join('');
+  if(selDay>t) html += S.routines.filter(r=>routineOn(r,sd)).map(r=>`<div class="row ghostrow"><span class="chk dash"></span><div class="t">🔁 ${esc(r.text)}<span class="tag">OTOMATİK</span></div></div>`).join('');
+  $('#planList').innerHTML = html || `<div class="empty">${selDay<t?'Bu gün için kayıt yok.':'Bu güne henüz görev yok.<br>Yukarıdan ekle 👆'}</div>`;
+  $('#planForm').style.display = selDay<t ? 'none' : 'flex';
+  $('#planIn').placeholder = selDay===t ? 'Bugüne görev ekle' : selDay===tomorrow() ? 'Yarın ne yapacaksın?' : 'Bu güne görev ekle';
+}
+function selectDay(k){ selDay=k; const d=new Date(k+'T12:00'); calM=new Date(d.getFullYear(), d.getMonth(), 1); renderPlan(); }
+$('#calPrev').onclick = () => { calM = new Date(calM.getFullYear(), calM.getMonth()-1, 1); renderPlan(); };
+$('#calNext').onclick = () => { calM = new Date(calM.getFullYear(), calM.getMonth()+1, 1); renderPlan(); };
+$('#calGrid').onclick = e => { const b=e.target.closest('[data-d]'); if(b) selectDay(b.dataset.d); };
+$('#planForm').onsubmit = e => {
+  e.preventDefault(); const v=$('#planIn').value.trim(); if(!v) return;
+  addTask(v, selDay); $('#planIn').value=''; refreshLists(); toast(selDay===today()?'Eklendi':'📅 Plana eklendi');
 };
+$('#planList').onclick = onTaskClick;
+
+// ---------- sheet ----------
+function openSheet(title, html, onclick){ $('#shTitle').textContent=title; $('#shBody').innerHTML=html; $('#shBody').onclick=onclick||null; $('#sheet').classList.add('show'); $('#sheet .sheet').scrollTop=0; }
+function closeSheet(){ $('#sheet').classList.remove('show'); }
+$('#shClose').onclick = closeSheet;
+$('#sheet').onclick = e => { if(e.target.id==='sheet') closeSheet(); };
+
+// ---------- günün özeti ----------
+function summaryHTML(){
+  const t=today(), v=visibleTasks(), d=dayLog();
+  const done=v.filter(x=>x.done).length, undone=v.filter(x=>!x.done).sort(sortT);
+  const hDone=S.habits.filter(h=>h.days[t]).length, hTotal=S.habits.length;
+  const streak=Math.max(0,...S.habits.map(streakOf));
+  const r = v.length ? done/v.length : ((d.m||hDone) ? 1 : 0);
+  const [em,msg] = r>=1 ? ['🏆','Muhteşem bir gün! Hepsini bitirdin.'] : r>=.7 ? ['🔥','Çok iyi iş çıkardın. Yarın daha da iyi!'] :
+    r>=.4 ? ['👍','Fena değil. Yarın en önemli işle başla.'] : r>0 ? ['🌱','Her adım sayılır. Yarın yeni bir sayfa.'] : ['🌙','Sakin bir gün. Yarın küçük bir adımla başla.'];
+  const own = undone.filter(x=>!x.rid);
+  return `<div class="sumhero"><div class="em">${em}</div><p>${msg}</p></div>
+  <div class="stats">
+    <div class="stat"><b>${done}/${v.length}</b><span>Görev</span></div>
+    <div class="stat"><b>${hDone}/${hTotal}</b><span>Alışkanlık</span></div>
+    <div class="stat"><b>${d.m||0}</b><span>Odak dk</span></div>
+    <div class="stat"><b>+${Math.max(0,d.x||0)}</b><span>XP</span></div>
+    <div class="stat"><b>${d.p||0}</b><span>Pomodoro</span></div>
+    <div class="stat"><b>${streak}🔥</b><span>En iyi seri</span></div>
+  </div>
+  ${own.length ? `<h2>Yarım kalanlar</h2><div class="card">${own.map(x=>`<div class="row" data-id="${x.id}"><div class="t">${esc(x.text)}</div><button class="mv" data-a="mv">Yarına →</button></div>`).join('')}</div>
+    ${own.length>1?'<button class="ghost wide" data-a="mvall">Hepsini yarına taşı</button>':''}` : ''}
+  <button class="big wide" data-a="plan">📅 Yarını planla →</button>`;
+}
+function openSummary(){ S.sumShown=today(); save(); openSheet('🌙 Günün özeti', summaryHTML(), summaryClick); }
+function summaryClick(e){
+  const b=e.target.closest('[data-a]'); if(!b) return;
+  if(b.dataset.a==='plan'){ closeSheet(); goTab('plan'); selectDay(tomorrow()); return; }
+  if(b.dataset.a==='mvall'){ visibleTasks().filter(x=>!x.done && !x.rid).forEach(x=>x.day=tomorrow()); toast('Hepsi yarına taşındı'); }
+  if(b.dataset.a==='mv'){ const x=S.tasks.find(x=>x.id===b.closest('.row').dataset.id); if(x){ x.day=tomorrow(); toast('Yarına taşındı'); } }
+  save(); refreshLists(); $('#shBody').innerHTML=summaryHTML();
+}
+function maybeAutoSummary(){
+  if(new Date().getHours()>=S.notif.sum && S.sumShown!==today() && (S.tasks.length || S.habits.length) && !$('#sheet').classList.contains('show')) openSummary();
+}
+$('#openSum').onclick = openSummary;
+
+// ---------- bildirimler (web push) ----------
+const PUSH_URL = 'https://motive-push.giveasolace.workers.dev';
+const VAPID_PUBLIC = 'BDMdAzvj94MzI0-fdgNqQo2l1xFBlVZwofnCFR-s7VGeC691tq6rC4GgPykihlS6JHeDCmz10boJzT9p6pbDpck';
+const NT = [['morn','☀️ Sabah planı'],['mid','🔥 Alışkanlık hatırlatma'],['sum','🌙 Günün özeti']];
+const prefs = () => ({sum:S.notif.sum, morn:S.notif.morn, mid:S.notif.mid, on:S.notif.on});
+const pushOK = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const isOn = () => S.notif.subscribed && pushOK() && Notification.permission==='granted';
+function renderNotif(){
+  const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+  let st;
+  if(!standalone && /iPhone|iPad/.test(navigator.userAgent)) st='⚠️ Bildirim için önce Safari → Paylaş → <b>Ana Ekrana Ekle</b>, sonra uygulamayı ana ekrandaki ikondan aç.';
+  else if(!pushOK()) st='Bu tarayıcı bildirimleri desteklemiyor.';
+  else if(Notification.permission==='denied') st='Bildirim izni kapalı. iPhone Ayarlar → Bildirimler → Motive kısmından aç.';
+  else if(isOn()) st='✅ Bildirimler açık. Uygulama kapalıyken de gelir.';
+  else st='Aç, seçtiğin saatlerde hatırlatma gelsin.';
+  $('#nStatus').innerHTML = st;
+  $('#nOn').textContent = isOn() ? 'Bildirimleri kapat' : '🔔 Bildirimleri aç';
+  $('#nTest').style.display = isOn() ? '' : 'none';
+  $('#nRows').innerHTML = NT.map(([k,l])=>`<div class="nrow"><button class="tgl ${S.notif.on[k]?'on':''}" data-k="${k}" aria-label="${l}"></button><span>${l}</span>
+    <select data-h="${k}">${Array.from({length:24},(_,i)=>`<option value="${i}" ${S.notif[k]===i?'selected':''}>${pad(i)}:00</option>`).join('')}</select></div>`).join('');
+}
+function b64u(s){ s=s.replace(/-/g,'+').replace(/_/g,'/'); s+='='.repeat((4-s.length%4)%4); return Uint8Array.from(atob(s), c=>c.charCodeAt(0)); }
+async function api(path, body){
+  const r = await fetch(PUSH_URL+path, {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(body)});
+  const j = await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.error||j.detail||('HTTP '+r.status)); return j;
+}
+async function getSub(create){
+  const reg = await navigator.serviceWorker.ready; let sub = await reg.pushManager.getSubscription();
+  if(!sub && create) sub = await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64u(VAPID_PUBLIC)});
+  return sub;
+}
+async function syncPush(){ if(!isOn()) return; try{ const sub=await getSub(false); if(sub) await api('/subscribe',{sub:sub.toJSON(), prefs:prefs()}); }catch(e){} }
+$('#nOn').onclick = async () => {
+  try{
+    if(isOn()){ const sub=await getSub(false); if(sub){ await api('/unsubscribe',{endpoint:sub.endpoint}).catch(()=>{}); await sub.unsubscribe(); }
+      S.notif.subscribed=false; save(); renderNotif(); return toast('Bildirimler kapatıldı'); }
+    if(!pushOK()) return toast('Önce ana ekrana ekle 📲');
+    const p = await Notification.requestPermission(); if(p!=='granted'){ renderNotif(); return toast('İzin verilmedi'); }
+    const sub = await getSub(true); await api('/subscribe',{sub:sub.toJSON(), prefs:prefs()});
+    S.notif.subscribed=true; save(); renderNotif(); confetti(60); toast('🔔 Bildirimler açık');
+  }catch(e){ renderNotif(); toast('Hata: '+String(e.message||e).slice(0,60)); }
+};
+$('#nRows').onclick = e => { const b=e.target.closest('[data-k]'); if(!b) return; S.notif.on[b.dataset.k]=!S.notif.on[b.dataset.k]; save(); renderNotif(); syncPush(); };
+$('#nRows').onchange = e => { const s=e.target.closest('[data-h]'); if(!s) return; S.notif[s.dataset.h]=+s.value; save(); syncPush(); };
+$('#nTest').onclick = async () => {
+  try{ S.testAt=Date.now(); save(); await writeSnap(); const sub=await getSub(false); if(!sub) return toast('Abonelik bulunamadı');
+    await api('/test',{endpoint:sub.endpoint}); toast('Gönderildi, birkaç saniyede gelir');
+  }catch(e){ toast('Hata: '+String(e.message||e).slice(0,60)); }
+};
+
+// ---------- service worker için anlık özet (IndexedDB) ----------
+function idb(){ return new Promise((res,rej)=>{ const r=indexedDB.open('motive',1); r.onupgradeneeded=()=>r.result.createObjectStore('kv'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+async function writeSnap(){
+  try{
+    const t=today(), v=visibleTasks(), und=v.filter(x=>!x.done).sort(sortT), d=S.log[t]||{};
+    const plan={};
+    for(let i=0;i<8;i++){ const dd=addDays(new Date(),i), k=dkey(dd); const ts=S.tasks.filter(x=>!x.done && !x.rid && x.day===k).sort(sortT);
+      plan[k]={n:ts.length, first:ts[0]?ts[0].text:'', r:S.routines.filter(r=>routineOn(r,dd)).map(r=>r.text)}; }
+    const snap={date:t, total:v.length, done:v.length-und.length, first:und[0]?und[0].text:'', carry:S.tasks.filter(x=>!x.done && !x.rid && x.day<t).length,
+      hTotal:S.habits.length, hPending:S.habits.filter(h=>!h.days[t]).length, m:d.m||0, x:d.x||0, plan, notif:prefs(), testAt:S.testAt||0};
+    const db=await idb();
+    await new Promise((res,rej)=>{ const tx=db.transaction('kv','readwrite'); tx.objectStore('kv').put(snap,'snap'); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); });
+    db.close();
+  }catch(e){}
+}
 
 // ---------- habits ----------
 function streakOf(h){
@@ -453,7 +728,7 @@ $('#habitList').onclick = e => {
   const id = b.closest('.habit').dataset.id; const h = S.habits.find(x=>x.id===id); if(!h) return;
   if(b.dataset.a==='del'){ if(confirm(`"${h.name}" silinsin mi?`)){ S.habits=S.habits.filter(x=>x!==h); save(); renderHabits(); } return; }
   const t = today();
-  if(h.days[t]){ delete h.days[t]; S.xp=Math.max(0,S.xp-15); save(); renderTop(); }
+  if(h.days[t]){ delete h.days[t]; loseXP(15); }
   else {
     h.days[t]=true; buzz(); const r=b.getBoundingClientRect(); confetti(40,r.left+r.width/2,r.top);
     const st = streakOf(h); h.best=Math.max(h.best||0,st);
@@ -500,7 +775,7 @@ function tick(){
   renderTimer();
 }
 setInterval(tick, 500);
-document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ tick(); applyFreezes(); renderAll(); } });
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ tick(); materializeRoutines(); applyFreezes(); renderAll(); maybeAutoSummary(); } });
 $('#tStart').onclick = () => {
   unlockAudio();
   if(S.timer.running){ S.timer.left=leftNow(); S.timer.running=false; }
@@ -554,13 +829,14 @@ $('#imp').onchange = e => {
 $('#wipe').onclick = () => { if(confirm('Tüm görevler, alışkanlıklar ve XP silinecek. Emin misin?')){ S=defaults(); save(); renderAll(); toast('Sıfırlandı'); } };
 
 // ---------- tabs ----------
-$('#tabs').onclick = e => {
-  const b=e.target.closest('button'); if(!b) return;
-  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
-  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on', v.id==='v-'+b.dataset.v));
-  if(b.dataset.v==='me') renderMe();
+function goTab(v){
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on', x.dataset.v===v));
+  document.querySelectorAll('.view').forEach(x=>x.classList.toggle('on', x.id==='v-'+v));
+  if(v==='me'){ renderMe(); renderNotif(); }
+  if(v==='plan') renderPlan();
   window.scrollTo(0,0);
-};
+}
+$('#tabs').onclick = e => { const b=e.target.closest('button'); if(b) goTab(b.dataset.v); };
 
 // ---------- fx ----------
 let tT; function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(tT); tT=setTimeout(()=>t.classList.remove('show'),1600); }
@@ -596,10 +872,13 @@ async function notify(title, body){
 }
 
 // ---------- init ----------
-function renderAll(){ renderTop(); showQuote(); renderTasks(); renderHabits(); renderSeg(); renderTimer(); renderStats(); renderMe(); }
+function renderAll(){ renderTop(); showQuote(); renderTasks(); renderHabits(); renderSeg(); renderTimer(); renderStats(); renderMe(); renderPlan(); renderNotif(); }
 // geçmiş: 30 günden eski tamamlanmış görevleri temizle
 const cut = dkey(addDays(new Date(),-30)); S.tasks = S.tasks.filter(t=>!t.done || t.doneOn>=cut); save();
-applyFreezes(); renderAll(); checkBadges();
+materializeRoutines(); applyFreezes(); renderAll(); checkBadges();
+if(new URLSearchParams(location.search).has('ozet')){ history.replaceState(null,'',location.pathname); openSummary(); } else maybeAutoSummary();
+writeSnap(); syncPush();
+if('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e=>{ if(e.data==='ozet') openSummary(); });
 if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(()=>{});
 })();
 </script>
