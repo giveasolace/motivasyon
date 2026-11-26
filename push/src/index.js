@@ -11,7 +11,7 @@ const TZ_OFFSET = 3; // Türkiye: UTC+3, yaz saati yok
 
 const cors = o => ({
   'Access-Control-Allow-Origin': ORIGINS.includes(o) ? o : ORIGINS[0],
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'content-type',
   'Access-Control-Max-Age': '86400',
   Vary: 'Origin',
@@ -45,11 +45,58 @@ async function sendPush(sub, env) {
   });
 }
 
+// ---------- Fiyatlar (Cüzdan) ----------
+const SYM_RE = /^[A-Z0-9.=^-]{1,15}$/;
+const OZ = 31.1034768;
+const VIRTUAL = { GRAM: 'GC=F', CEYREK: 'GC=F', YARIM: 'GC=F', TAM: 'GC=F', GUMUS: 'SI=F' };
+const GOLD_PURE = { GRAM: 1, CEYREK: 1.6065, YARIM: 3.213, TAM: 6.426 }; // saf altın gramı (22 ayar sikkeler)
+async function yahoo(sym) {
+  const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=1d`,
+    { headers: { 'User-Agent': 'Mozilla/5.0' }, cf: { cacheTtl: 600, cacheEverything: true } });
+  if (!r.ok) return null;
+  const m = (await r.json())?.chart?.result?.[0]?.meta;
+  return m && typeof m.regularMarketPrice === 'number' ? { p: m.regularMarketPrice, prev: m.chartPreviousClose, cur: m.currency } : null;
+}
+async function prices(syms) {
+  const need = new Set(['USDTRY=X']);
+  for (const s of syms) need.add(VIRTUAL[s] || s);
+  const raw = {};
+  await Promise.all([...need].map(async s => { raw[s] = await yahoo(s).catch(() => null); }));
+  const usd = raw['USDTRY=X']?.p, usdPrev = raw['USDTRY=X']?.prev;
+  const out = {};
+  for (const s of syms) {
+    const r = raw[VIRTUAL[s] || s];
+    if (!r) { out[s] = null; continue; }
+    let p = r.p, prev = r.prev;
+    if (VIRTUAL[s]) { const g = GOLD_PURE[s] || 1; p = r.p / OZ * usd * g; prev = r.prev && usdPrev ? r.prev / OZ * usdPrev * g : null; }
+    else if (r.cur === 'USD' && s !== 'USDTRY=X') { p = r.p * usd; prev = r.prev && usdPrev ? r.prev * usdPrev : null; }
+    else if (r.cur && r.cur !== 'TRY' && r.cur !== 'USD') { out[s] = { p: null, err: 'kur desteklenmiyor: ' + r.cur }; continue; }
+    out[s] = { p: Math.round(p * 10000) / 10000, chg: prev ? Math.round((p / prev - 1) * 10000) / 100 : null };
+  }
+  return out;
+}
+
+export function isDue(p, h, day) {
+  if (p.app === 'cuzdan') return p.hour === h && (p.dates || []).includes(day);
+  return ['sum', 'morn', 'mid'].some(t => p.on?.[t] && p[t] === h);
+}
+
 export default {
   async fetch(req, env) {
     const o = req.headers.get('Origin') || '';
     const path = new URL(req.url).pathname;
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(o) });
+    if (req.method === 'GET' && path === '/prices') {
+      const syms = [...new Set((new URL(req.url).searchParams.get('s') || '').toUpperCase().split(',').map(x => x.trim()).filter(x => SYM_RE.test(x)))].slice(0, 30);
+      if (!syms.length) return json({ error: 'sembol yok' }, 400, o);
+      const cache = caches.default, ck = new Request('https://cache.local/prices?s=' + syms.sort().join(','));
+      let hit = await cache.match(ck);
+      if (!hit) {
+        hit = new Response(JSON.stringify({ prices: await prices(syms), at: Date.now() }), { headers: { 'content-type': 'application/json', 'Cache-Control': 'max-age=600' } });
+        await cache.put(ck, hit.clone());
+      }
+      return new Response(hit.body, { headers: { 'content-type': 'application/json', ...cors(o) } });
+    }
     if (req.method !== 'POST') return json({ ok: true, service: 'motive-push' }, 200, o);
 
     let body;
@@ -60,7 +107,9 @@ export default {
       if (!sub || !validSub(sub) || !sub.keys) return json({ error: 'geçersiz abonelik' }, 400, o);
       const p = body.prefs || {};
       const hour = v => (Number.isInteger(v) && v >= 0 && v < 24 ? v : null);
-      const prefs = { sum: hour(p.sum) ?? 22, morn: hour(p.morn) ?? 9, mid: hour(p.mid) ?? 16, on: { sum: !!p.on?.sum, morn: !!p.on?.morn, mid: !!p.on?.mid } };
+      const prefs = p.app === 'cuzdan'
+        ? { app: 'cuzdan', hour: hour(p.hour) ?? 10, dates: (Array.isArray(p.dates) ? p.dates : []).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).slice(0, 120) }
+        : { sum: hour(p.sum) ?? 22, morn: hour(p.morn) ?? 9, mid: hour(p.mid) ?? 16, on: { sum: !!p.on?.sum, morn: !!p.on?.morn, mid: !!p.on?.mid } };
       await env.SUBS.put(await keyOf(sub.endpoint), JSON.stringify({ sub: { endpoint: sub.endpoint, keys: sub.keys }, prefs, at: Date.now() }));
       return json({ ok: true }, 200, o);
     }
@@ -78,7 +127,8 @@ export default {
   },
 
   async scheduled(event, env) {
-    const h = (new Date(event.scheduledTime).getUTCHours() + TZ_OFFSET) % 24;
+    const local = new Date(event.scheduledTime + TZ_OFFSET * 3600 * 1000);
+    const h = local.getUTCHours(), day = local.toISOString().slice(0, 10);
     let cursor;
     do {
       const list = await env.SUBS.list({ cursor });
@@ -87,7 +137,7 @@ export default {
         const rec = await env.SUBS.get(k.name, 'json');
         if (!rec) continue;
         const p = rec.prefs || {};
-        if (!['sum', 'morn', 'mid'].some(t => p.on?.[t] && p[t] === h)) continue;
+        if (!isDue(p, h, day)) continue;
         const r = await sendPush(rec.sub, env);
         console.log('push', h, r.status);
         if (r.status === 404 || r.status === 410) await env.SUBS.delete(k.name);
