@@ -1,4 +1,4 @@
-const CACHE = 'motive-v3';
+const CACHE = 'motive-v4';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -69,7 +69,7 @@ function buildMessage(s) {
       : { title: '💪 Alışkanlıklar tamam', body: 'Bugünün tüm alışkanlıklarını yaptın. Harikasın!', url: './' };
   }
   if (!fresh) return { title: '🌙 Günün özeti', body: 'Bugün uygulamayı hiç açmadın. Yarını planlamak için 1 dakikan var mı?', url: './?ozet=1' };
-  return { title: '🌙 Günün özeti', body: `${s.done}/${s.total} görev · ${s.m} dk odak · +${Math.max(0, s.x)} XP. Yarını planla →`, url: './?ozet=1' };
+  return { title: '🌙 Günün özeti', body: `${s.done}/${s.total} görev · ${s.m} dk odak · +${Math.max(0, s.x)} XP${s.aTotal ? ` · 🚫 ${s.aClean}/${s.aTotal} temiz` : ''}. Yarını planla →`, url: './?ozet=1' };
 }
 
 self.addEventListener('push', e => {

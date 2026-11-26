@@ -78,6 +78,12 @@ h2{font-size:17px;margin:22px 0 10px}
 .heat i{aspect-ratio:1;border-radius:3px;background:var(--line)}
 .heat i.on{background:var(--good)}
 .heat i.ice{background:#7cc4ff}
+.heat i.slip{background:#e5484d}
+.slipbtn{background:var(--bg);color:#e5484d;border-radius:12px;padding:0 10px;height:44px;font-size:12px;font-weight:700;flex:none}
+.slipbtn.on{background:#e5484d;color:#fff}
+.hbtn.avoid.on{background:#3d8bff}
+.heat.avoid i.on{background:#3d8bff}
+.sumavoid{display:flex;gap:8px;flex:none}
 .freeze{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:16px;padding:12px 14px;margin-bottom:14px;box-shadow:var(--shadow)}
 .freeze .fi{font-size:26px}
 .freeze .ft{flex:1;min-width:0;font-size:14px;color:var(--muted);line-height:1.35}
@@ -228,6 +234,10 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:25;width:100%;heigh
     <form class="add" id="habitForm"><input id="habitIn" placeholder="Örn: 💧 2L su iç" autocomplete="off" enterkeyhint="done"><button aria-label="Ekle">+</button></form>
     <div class="freeze"><div class="fi">❄️</div><div class="ft" id="frzTxt"></div><button id="frzBuy">100 XP ile al</button></div>
     <div class="card" id="habitList"></div>
+    <h2>🚫 Kaçamaklar</h2>
+    <p class="sub">Uzak durmak istediğin şeyler. Gün boyu temiz kaldıysan tikle, kaçırdıysan dürüstçe işaretle.</p>
+    <form class="add" id="avoidForm"><input id="avoidIn" placeholder="Örn: Paketli gıda yemedim" autocomplete="off" enterkeyhint="done"><button aria-label="Ekle">+</button></form>
+    <div class="card" id="avoidList"></div>
   </section>
 
   <!-- ODAK -->
@@ -434,13 +444,16 @@ function visibleTasks(){
   return S.tasks.filter(x => x.done ? x.doneOn===t : x.day<=t);
 }
 const isAuto = x => !!(x.rid || x.hid);
+const isAvoid = id => { const h=S.habits.find(h=>h.id===id); return !!(h && h.kind==='avoid'); };
+const goodHabits = () => S.habits.filter(h=>h.kind!=='avoid');
+const avoids = () => S.habits.filter(h=>h.kind==='avoid');
 const sortT = (a,b)=>(a.done-b.done)||((isAuto(a)?1:0)-(isAuto(b)?1:0))||(a.created-b.created);
 function rowHTML(x){
   const late = !x.done && !isAuto(x) && x.day<today();
   const tag = late ? `<span class="tag">${x.day===dkey(addDays(new Date(),-1))?'DÜNDEN':'GECİKMİŞ'}</span>` : '';
   return `<div class="row ${x.done?'done':''}" data-id="${x.id}">
     <button class="chk ${x.done?'on':''}" data-a="tog" aria-label="Tamamla"></button>
-    <div class="t">${x.rid?'🔁 ':x.hid?'🔥 ':''}${esc(x.text)}${tag}</div>
+    <div class="t">${x.rid?'🔁 ':x.hid?(isAvoid(x.hid)?'🚫 ':'🔥 '):''}${esc(x.text)}${tag}</div>
     <button class="x" data-a="del" aria-label="Sil">×</button></div>`;
 }
 function renderTasks(){
@@ -563,7 +576,7 @@ function renderPlan(){
   const list = (selDay===t ? visibleTasks() : S.tasks.filter(x=>x.day===selDay)).sort(sortT);
   let html = list.map(rowHTML).join('');
   const ghost = (ic,txt) => `<div class="row ghostrow"><span class="chk dash"></span><div class="t">${ic} ${esc(txt)}<span class="tag">OTOMATİK</span></div></div>`;
-  if(selDay>t) html += S.routines.filter(r=>routineOn(r,sd)).map(r=>ghost('🔁',r.text)).join('') + S.habits.map(h=>ghost('🔥',h.name)).join('');
+  if(selDay>t) html += S.routines.filter(r=>routineOn(r,sd)).map(r=>ghost('🔁',r.text)).join('') + S.habits.map(h=>ghost(h.kind==='avoid'?'🚫':'🔥',h.name)).join('');
   $('#planList').innerHTML = html || `<div class="empty">${selDay<t?'Bu gün için kayıt yok.':'Bu güne henüz görev yok.<br>Yukarıdan ekle 👆'}</div>`;
   $('#planForm').style.display = selDay<t ? 'none' : 'flex';
   $('#planIn').placeholder = selDay===t ? 'Bugüne görev ekle' : selDay===tomorrow() ? 'Yarın ne yapacaksın?' : 'Bu güne görev ekle';
@@ -588,7 +601,8 @@ $('#sheet').onclick = e => { if(e.target.id==='sheet') closeSheet(); };
 function summaryHTML(){
   const t=today(), v=visibleTasks(), d=dayLog();
   const done=v.filter(x=>x.done).length, undone=v.filter(x=>!x.done).sort(sortT);
-  const hDone=S.habits.filter(h=>h.days[t]).length, hTotal=S.habits.length;
+  const hDone=goodHabits().filter(h=>h.days[t]).length, hTotal=goodHabits().length;
+  const av=avoids(), aClean=av.filter(h=>h.days[t]).length;
   const streak=Math.max(0,...S.habits.map(streakOf));
   const r = v.length ? done/v.length : ((d.m||hDone) ? 1 : 0);
   const [em,msg] = r>=1 ? ['🏆','Muhteşem bir gün! Hepsini bitirdin.'] : r>=.7 ? ['🔥','Çok iyi iş çıkardın. Yarın daha da iyi!'] :
@@ -605,12 +619,19 @@ function summaryHTML(){
   </div>
   ${own.length ? `<h2>Yarım kalanlar</h2><div class="card">${own.map(x=>`<div class="row" data-id="${x.id}"><div class="t">${esc(x.text)}</div><button class="mv" data-a="mv">Yarına →</button></div>`).join('')}</div>
     ${own.length>1?'<button class="ghost wide" data-a="mvall">Hepsini yarına taşı</button>':''}` : ''}
+  ${av.length ? `<h2>🚫 Kaçamaklar · ${aClean}/${av.length} temiz</h2><div class="card">${av.map(h=>`<div class="row" data-h="${h.id}"><div class="t">${esc(h.name)}</div>
+    <div class="sumavoid"><button class="slipbtn ${h.slips&&h.slips[t]?'on':''}" data-a="aslip">Kaçamak</button><button class="hbtn avoid ${h.days[t]?'on':''}" data-a="aclean" aria-label="Temiz kaldım">${h.days[t]?'✓':'+'}</button></div></div>`).join('')}</div>` : ''}
   <button class="big wide" data-a="plan">📅 Yarını planla →</button>`;
 }
 function openSummary(){ S.sumShown=today(); save(); openSheet('🌙 Günün özeti', summaryHTML(), summaryClick); }
 function summaryClick(e){
   const b=e.target.closest('[data-a]'); if(!b) return;
   if(b.dataset.a==='plan'){ closeSheet(); goTab('plan'); selectDay(tomorrow()); return; }
+  if(b.dataset.a==='aclean' || b.dataset.a==='aslip'){
+    const h=S.habits.find(h=>h.id===b.closest('.row').dataset.h); if(!h) return;
+    if(b.dataset.a==='aclean') toggleHabit(h,b); else toggleSlip(h);
+    $('#shBody').innerHTML=summaryHTML(); return;
+  }
   if(b.dataset.a==='mvall'){ visibleTasks().filter(x=>!x.done && !isAuto(x)).forEach(x=>x.day=tomorrow()); toast('Hepsi yarına taşındı'); }
   if(b.dataset.a==='mv'){ const x=S.tasks.find(x=>x.id===b.closest('.row').dataset.id); if(x){ x.day=tomorrow(); toast('Yarına taşındı'); } }
   save(); refreshLists(); $('#shBody').innerHTML=summaryHTML();
@@ -679,7 +700,8 @@ async function writeSnap(){
     for(let i=0;i<8;i++){ const dd=addDays(new Date(),i), k=dkey(dd); const ts=S.tasks.filter(x=>!x.done && !isAuto(x) && x.day===k).sort(sortT);
       plan[k]={n:ts.length, first:ts[0]?ts[0].text:'', r:S.routines.filter(r=>routineOn(r,dd)).map(r=>r.text).concat(S.habits.map(h=>h.name))}; }
     const snap={date:t, total:v.length, done:v.length-und.length, first:und[0]?und[0].text:'', carry:S.tasks.filter(x=>!x.done && !isAuto(x) && x.day<t).length,
-      hTotal:S.habits.length, hPending:S.habits.filter(h=>!h.days[t]).length, m:d.m||0, x:d.x||0, plan, notif:prefs(), testAt:S.testAt||0};
+      hTotal:goodHabits().length, hPending:goodHabits().filter(h=>!h.days[t]).length,
+      aTotal:avoids().length, aClean:avoids().filter(h=>h.days[t]).length, m:d.m||0, x:d.x||0, plan, notif:prefs(), testAt:S.testAt||0};
     const db=await idb();
     await new Promise((res,rej)=>{ const tx=db.transaction('kv','readwrite'); tx.objectStore('kv').put(snap,'snap'); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); });
     db.close();
@@ -690,7 +712,7 @@ async function writeSnap(){
 function streakOf(h){
   let n=0, d=new Date();
   if(!h.days[dkey(d)]) d=addDays(d,-1);
-  for(let k=dkey(d); h.days[k] || S.frozen[k]; d=addDays(d,-1), k=dkey(d)){ if(h.days[k]) n++; }
+  for(let k=dkey(d); (h.days[k] || S.frozen[k]) && !(h.slips && h.slips[k]); d=addDays(d,-1), k=dkey(d)){ if(h.days[k]) n++; }
   return n;
 }
 // ---------- streak freeze ----------
@@ -702,7 +724,7 @@ function applyFreezes(){
   const used=[];
   for(let k=dkey(d); k<=y; d=addDays(d,1), k=dkey(d)){
     const prev = dkey(addDays(d,-1));
-    const atRisk = S.habits.some(h => !h.days[k] && (h.days[prev] || S.frozen[prev]) );
+    const atRisk = S.habits.some(h => !h.days[k] && !(h.slips && h.slips[k]) && (h.days[prev] || S.frozen[prev]) );
     if(atRisk && !S.frozen[k] && S.freezes>0){ S.freezes--; S.frozen[k]=true; used.push(k); }
   }
   S.freezeChecked = y; save();
@@ -725,7 +747,21 @@ $('#frzBuy').onclick = e => {
 function maxStreak(s){ return Math.max(0,...(s.habits||[]).map(h=>h.best||0)); }
 function renderHabits(){
   const t = today();
-  $('#habitList').innerHTML = S.habits.length ? S.habits.map(h=>{
+  const av = avoids();
+  $('#avoidList').innerHTML = av.length ? av.map(h=>{
+    const st = streakOf(h); let cells='';
+    for(let i=29;i>=0;i--){ const k=dkey(addDays(new Date(),-i)); cells+=`<i class="${h.slips&&h.slips[k]?'slip':h.days[k]?'on':S.frozen[k]?'ice':''} ${i===0?'today':''}"></i>`; }
+    const slipped = h.slips && h.slips[t];
+    return `<div class="habit" data-id="${h.id}">
+      <div class="hhead">
+        <div class="hname">${esc(h.name)}<div class="streak">${slipped?'Bugün kaçamak oldu — yarın yeniden 💪':st?`🛡️ <b>${st} gün</b> temiz`:'Bugün temiz kal'} · en iyi ${h.best||0}</div></div>
+        <button class="x" data-a="del" aria-label="Sil">×</button>
+        <button class="slipbtn ${slipped?'on':''}" data-a="slip">Kaçamak</button>
+        <button class="hbtn avoid ${h.days[t]?'on':''}" data-a="tog" aria-label="Bugün temiz kaldım">${h.days[t]?'✓':'+'}</button>
+      </div><div class="heat avoid">${cells}</div></div>`;
+  }).join('') : `<div class="empty">Uzak durmak istediğin şeyleri ekle.<br>Örn: 🍟 Paketli gıda yemedim, 🍔 Dışarıda yemedim, 🥤 Gazlı içecek içmedim</div>`;
+  const gh = goodHabits();
+  $('#habitList').innerHTML = gh.length ? gh.map(h=>{
     const st = streakOf(h); let cells='';
     for(let i=29;i>=0;i--){ const k=dkey(addDays(new Date(),-i)); cells+=`<i class="${h.days[k]?'on':S.frozen[k]?'ice':''} ${i===0?'today':''}"></i>`; }
     return `<div class="habit" data-id="${h.id}">
@@ -740,19 +776,31 @@ $('#habitForm').onsubmit = e => {
   e.preventDefault(); const v=$('#habitIn').value.trim(); if(!v) return;
   S.habits.push({id:uid(), name:v, days:{}, best:0}); $('#habitIn').value=''; materializeRoutines(); renderHabits(); refreshLists();
 };
-$('#habitList').onclick = e => {
+$('#avoidForm').onsubmit = e => {
+  e.preventDefault(); const v=$('#avoidIn').value.trim(); if(!v) return;
+  S.habits.push({id:uid(), name:v, kind:'avoid', days:{}, slips:{}, best:0}); $('#avoidIn').value=''; materializeRoutines(); renderHabits(); refreshLists();
+};
+$('#habitList').onclick = $('#avoidList').onclick = e => {
   const b = e.target.closest('[data-a]'); if(!b) return;
   const id = b.closest('.habit').dataset.id; const h = S.habits.find(x=>x.id===id); if(!h) return;
   if(b.dataset.a==='del'){ if(confirm(`"${h.name}" silinsin mi?`)){ S.habits=S.habits.filter(x=>x!==h); materializeRoutines(); renderHabits(); refreshLists(); } return; }
+  if(b.dataset.a==='slip') return toggleSlip(h);
   toggleHabit(h, b);
 };
+function toggleSlip(h){
+  const t = today(); h.slips ||= {};
+  if(h.slips[t]) delete h.slips[t];
+  else { h.slips[t]=true; if(h.days[t]){ delete h.days[t]; loseXP(15); } toast('Olur böyle günler. Yarın yeniden 💪'); }
+  syncHabitTasks(); save(); renderHabits(); refreshLists();
+}
 function toggleHabit(h, b){
   const t = today();
   if(h.days[t]){ delete h.days[t]; loseXP(15); }
   else {
-    h.days[t]=true; buzz(); const r=b.getBoundingClientRect(); confetti(40,r.left+r.width/2,r.top);
+    if(h.slips) delete h.slips[t];
+    h.days[t]=true; buzz(); const r=b.getBoundingClientRect(); confetti(40,r.left+r.width/2,r.top, h.kind==='avoid'?['#3d8bff','#7cc4ff','#22b573','#ffffff']:undefined);
     const st = streakOf(h); h.best=Math.max(h.best||0,st);
-    gainXP(15,'Alışkanlık');
+    gainXP(15, h.kind==='avoid'?'Temiz gün':'Alışkanlık');
     const bk = h.id+':'+t;
     if(st>0 && st%7===0 && !S.bonus[bk]){ S.bonus[bk]=1; setTimeout(()=>{confetti(180); gainXP(50,`${st} gün seri!`); modal('🔥',`${st} gün seri!`,`"${h.name}" zincirini ${st} gündür kırmadın. Muhteşem!`);},500); }
   }
