@@ -48,8 +48,8 @@ async function sendPush(sub, env) {
 // ---------- Fiyatlar (Cüzdan) ----------
 const SYM_RE = /^[A-Z0-9.=^-]{1,15}$/;
 const OZ = 31.1034768;
-const VIRTUAL = { GRAM: 'GC=F', CEYREK: 'GC=F', YARIM: 'GC=F', TAM: 'GC=F', GUMUS: 'SI=F' };
-const GOLD_PURE = { GRAM: 1, CEYREK: 1.6065, YARIM: 3.213, TAM: 6.426 }; // saf altın gramı (22 ayar sikkeler)
+const VIRTUAL = { GRAM: 'GC=F', CEYREK: 'GC=F', YARIM: 'GC=F', TAM: 'GC=F', ATA: 'GC=F', GUMUS: 'SI=F' };
+const GOLD_PURE = { GRAM: 1, CEYREK: 1.6065, YARIM: 3.213, TAM: 6.426, ATA: 6.6152 }; // saf altın gramı (22 ayar sikkeler; Ata 7,216 g × 0,9167)
 async function yahoo(sym) {
   const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=1d`,
     { headers: { 'User-Agent': 'Mozilla/5.0' }, cf: { cacheTtl: 600, cacheEverything: true } });
