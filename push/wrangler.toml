@@ -1,6 +1,7 @@
 name = "motive-push"
 main = "src/index.js"
 compatibility_date = "2025-09-01"
+compatibility_flags = ["nodejs_compat"]
 
 kv_namespaces = [{ binding = "SUBS", id = "8dcd2f7f5fd84cf58a67c97c55da8317" }]
 
