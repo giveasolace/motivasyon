@@ -174,6 +174,21 @@ h2{font-size:17px;margin:22px 0 10px}
 .nrow span{flex:1;font-weight:600;font-size:15px}
 .nrow select{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:6px 8px;font-size:15px}
 .nstatus{font-size:14px;color:var(--muted);margin:0 0 10px;line-height:1.45}
+/* namaz */
+.prayer{background:var(--card);border-radius:18px;box-shadow:var(--shadow);padding:14px;margin-bottom:18px}
+.prayer .ph{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:10px}
+.prayer .ph b{font-size:15px}
+.prayer .ph span{font-size:13px;color:var(--accent);font-weight:700;white-space:nowrap}
+.ptimes{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;text-align:center;margin-bottom:12px}
+.ptimes div{border-radius:10px;padding:6px 0}
+.ptimes small{display:block;font-size:10.5px;color:var(--muted);font-weight:600}
+.ptimes b{font-size:14px;font-variant-numeric:tabular-nums}
+.ptimes .next{background:var(--soft)}
+.ptimes .next b,.ptimes .next small{color:var(--accent)}
+.pchips{display:flex;gap:6px}
+.pchips button{flex:1;background:var(--bg);border-radius:12px;padding:9px 0;font-size:12.5px;font-weight:700;color:var(--text)}
+.pchips button.on{background:var(--good);color:#fff}
+.pchips button.wait{opacity:.45}
 /* tabs */
 nav{position:fixed;left:0;right:0;bottom:0;z-index:5;background:color-mix(in srgb,var(--card) 88%,transparent);
   backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--line);
@@ -211,6 +226,7 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:25;width:100%;heigh
   <!-- BUGÜN -->
   <section class="view on" id="v-today">
     <div class="quote"><p id="qText"></p><small id="qAuth"></small><button id="qNext" aria-label="Başka söz">↻</button></div>
+    <div class="prayer" id="prayerBox"></div>
     <h1 id="greet">Bugün</h1>
     <p class="sub" id="todaySub"></p>
     <form class="add" id="taskForm"><input id="taskIn" placeholder="Bugün ne yapacaksın?" autocomplete="off" enterkeyhint="done"><button aria-label="Ekle">+</button></form>
@@ -271,6 +287,12 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:25;width:100%;heigh
     <p class="nstatus" id="nStatus"></p>
     <div class="card" id="nRows"></div>
     <div class="btnrow" style="margin-top:10px"><button id="nOn">🔔 Bildirimleri aç</button><button id="nTest">Test gönder</button></div>
+    <h2>🕌 Namaz vakitleri</h2>
+    <div class="card"><div class="nrow"><span>Bugün sekmesinde göster</span><button class="tgl" id="pOn" aria-label="Namaz vakitleri"></button></div>
+      <div class="nrow"><span>Şehir</span><select id="pCity"></select></div>
+      <div class="nrow"><span>İlçe</span><select id="pIlce"></select></div></div>
+    <p class="nstatus" id="pStatus" style="margin-top:8px"></p>
+    <div class="btnrow"><button id="pRefresh">Vakitleri yenile</button></div>
     <h2>Son 7 gün</h2>
     <div class="card chart">
       <div class="legend"><span><i style="background:var(--accent)"></i>Görev</span><span><i style="background:var(--good)"></i>Odak (dk)</span></div>
@@ -391,6 +413,7 @@ const defaults = () => ({
   xp:0, tasks:[], habits:[], log:{}, // log[date] = {t:tasksDone, m:focusMin, p:pomos}
   stats:{tasks:0,pomos:0}, badges:[], bonus:{},
   spent:0, freezes:0, frozen:{}, freezeChecked:null,
+  prayer:{on:true, city:'577', ilce:'9930', place:'Van', days:{}, done:{}},
   routines:[], rskip:{}, sumShown:null, testAt:0,
   notif:{sum:22, morn:9, mid:16, on:{sum:true, morn:true, mid:true}, subscribed:false},
   focus:{work:25,brk:5}, timer:{mode:'work',running:false,endAt:0,left:25*60}, q:0
@@ -453,7 +476,7 @@ function rowHTML(x){
   const tag = late ? `<span class="tag">${x.day===dkey(addDays(new Date(),-1))?'DÜNDEN':'GECİKMİŞ'}</span>` : '';
   return `<div class="row ${x.done?'done':''}" data-id="${x.id}">
     <button class="chk ${x.done?'on':''}" data-a="tog" aria-label="Tamamla"></button>
-    <div class="t">${x.rid?'🔁 ':x.hid?(isAvoid(x.hid)?'🚫 ':'🔥 '):''}${esc(x.text)}${tag}</div>
+    <div class="t">${x.rid||x.from==='r'?'🔁 ':x.hid?(isAvoid(x.hid)?'🚫 ':'🔥 '):x.from==='h'?'🔥 ':''}${esc(x.text)}${tag}</div>
     <button class="x" data-a="del" aria-label="Sil">×</button></div>`;
 }
 function renderTasks(){
@@ -504,8 +527,15 @@ const wdText = wd => !wd||!wd.length||wd.length===7 ? 'Her gün'
   : WD_ORDER.filter(i=>wd.includes(i)).map(i=>WD[i]).join(', ');
 function materializeRoutines(){
   const t = today(), now = new Date();
-  // dünden kalan yapılmamış rutinler birikmesin
-  S.tasks = S.tasks.filter(x => !(x.rid && !x.done && x.day<t));
+  // dünden kalan yapılmamış rutin/alışkanlık → normal göreve dönüşüp ertesi güne taşınır (kaçamaklar hariç);
+  // aynı metinden zaten taşınmış yapılmamış görev varsa yenisi eklenmez (tek hatırlatma kalır)
+  const isCarried = y => !y.done && !y.rid && !y.hid && y.from;
+  const stale = S.tasks.filter(x => !x.done && x.day<t && (x.rid || (x.hid && !isAvoid(x.hid) && S.habits.some(h=>h.id===x.hid)))).sort((a,b)=>a.day.localeCompare(b.day));
+  for(const x of stale){
+    if(S.tasks.some(y=>y!==x && isCarried(y) && y.text===x.text)){ x._drop=true; continue; }
+    x.from = x.rid ? 'r' : 'h'; delete x.rid; delete x.hid;
+  }
+  S.tasks = S.tasks.filter(x => !x._drop && !(x.rid && !x.done && x.day<t));
   for(const r of S.routines){
     if(!routineOn(r,now) || S.rskip[r.id+':'+t]) continue;
     if(!S.tasks.some(x=>x.rid===r.id && x.day===t)) S.tasks.push({id:uid(), text:r.text, rid:r.id, done:false, day:t, created:Date.now()});
@@ -615,6 +645,7 @@ function summaryHTML(){
     <div class="stat"><b>${d.m||0}</b><span>Odak dk</span></div>
     <div class="stat"><b>+${Math.max(0,d.x||0)}</b><span>XP</span></div>
     <div class="stat"><b>${d.p||0}</b><span>Pomodoro</span></div>
+    ${S.prayer.on?`<div class="stat"><b>${Object.keys(S.prayer.done[t]||{}).length}/5</b><span>Namaz</span></div>`:''}
     <div class="stat"><b>${streak}🔥</b><span>En iyi seri</span></div>
   </div>
   ${own.length ? `<h2>Yarım kalanlar</h2><div class="card">${own.map(x=>`<div class="row" data-id="${x.id}"><div class="t">${esc(x.text)}</div><button class="mv" data-a="mv">Yarına →</button></div>`).join('')}</div>
@@ -707,6 +738,79 @@ async function writeSnap(){
     db.close();
   }catch(e){}
 }
+
+// ---------- namaz vakitleri (Diyanet verisi: ezanvakti.emushaf.net) ----------
+const EZAN='https://ezanvakti.emushaf.net';
+const PV=[['imsak','İmsak'],['gunes','Güneş'],['ogle','Öğle'],['ikindi','İkindi'],['aksam','Akşam'],['yatsi','Yatsı']];
+const PV_TO={imsak:"İmsak'a", gunes:"Güneş'e", ogle:"Öğle'ye", ikindi:"İkindi'ye", aksam:"Akşam'a", yatsi:"Yatsı'ya"};
+const PN=[['sabah','Sabah','imsak'],['ogle','Öğle','ogle'],['ikindi','İkindi','ikindi'],['aksam','Akşam','aksam'],['yatsi','Yatsı','yatsi']];
+const hm = s => { const [h,m]=String(s).split(':').map(Number); return h*60+m; };
+const nowMin = () => { const d=new Date(); return d.getHours()*60+d.getMinutes(); };
+let prayerFetching=false, prayerMin=-1, citiesCache=null;
+async function fetchPrayer(force){
+  const P=S.prayer; if(!P.on || prayerFetching) return;
+  const t=today(), ahead=Object.keys(P.days).filter(k=>k>=t).length;
+  if(!force && P.days[t] && ahead>=7 && P.ilceFetched===P.ilce) return;
+  prayerFetching=true;
+  try{
+    const r=await fetch(`${EZAN}/vakitler/${encodeURIComponent(P.ilce)}`); if(!r.ok) throw new Error('http');
+    const arr=await r.json(), days={};
+    for(const d of arr){ const [dd,mm,yy]=String(d.MiladiTarihKisa).split('.'); if(!yy) continue;
+      days[`${yy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`]={imsak:d.Imsak, gunes:d.Gunes, ogle:d.Ogle, ikindi:d.Ikindi, aksam:d.Aksam, yatsi:d.Yatsi}; }
+    if(!Object.keys(days).length) throw new Error('empty');
+    if(P.ilceFetched!==P.ilce) P.days={};
+    const old=dkey(addDays(new Date(),-2)); for(const k in P.days) if(k<old) delete P.days[k];
+    const oldDone=dkey(addDays(new Date(),-60)); for(const k in P.done) if(k<oldDone) delete P.done[k];
+    Object.assign(P.days, days); P.ilceFetched=P.ilce; P.err=false; save(); renderPrayer();
+    if(force) toast('🕌 Vakitler güncellendi');
+  }catch(e){ P.err=true; renderPrayer(); if(force) toast('Vakitler alınamadı (internet?)'); }
+  finally{ prayerFetching=false; }
+}
+function nextPrayer(v){
+  const m=nowMin();
+  for(const [k,l] of PV) if(hm(v[k])>m) return {k, diff:hm(v[k])-m};
+  const tm=S.prayer.days[dkey(addDays(new Date(),1))];
+  return tm ? {k:'imsak', diff:hm(tm.imsak)+1440-m} : null;
+}
+function renderPrayer(){
+  const box=$('#prayerBox'), P=S.prayer; if(!box) return;
+  if(!P.on){ box.style.display='none'; return; }
+  box.style.display='';
+  const t=today(), v=P.days[t];
+  if(!v){ box.innerHTML=`<div class="ph"><b>🕌 Namaz vakitleri · ${esc(P.place)}</b></div><p class="note" style="margin:0">${P.err?'Vakitler alınamadı, internet gelince yenilenecek.':'Vakitler yükleniyor…'}</p>`; return; }
+  const nx=nextPrayer(v), done=P.done[t]||{}, m=nowMin(), n=Object.keys(done).length;
+  const dur = d => d>=60 ? `${Math.floor(d/60)} sa ${d%60} dk` : `${d} dk`;
+  box.innerHTML = `<div class="ph"><b>🕌 ${esc(P.place)} · ${n}/5</b>${nx?`<span>${PV_TO[nx.k]} ${dur(nx.diff)}</span>`:''}</div>
+    <div class="ptimes">${PV.map(([k,l])=>`<div class="${nx&&nx.k===k&&hm(v[k])>m?'next':''}"><small>${l}</small><b>${esc(v[k])}</b></div>`).join('')}</div>
+    <div class="pchips">${PN.map(([k,l,tk])=>`<button data-pn="${k}" class="${done[k]?'on':hm(v[tk])>m?'wait':''}" aria-label="${l} namazı">${done[k]?'✓ ':''}${l}</button>`).join('')}</div>`;
+}
+function togglePrayer(k){
+  const t=today(), d=(S.prayer.done[t] ||= {});
+  if(d[k]){ delete d[k]; loseXP(5); }
+  else { d[k]=true; buzz(); gainXP(5,'Namaz');
+    if(Object.keys(d).length===5) setTimeout(()=>{ confetti(150); toast('🕌 Bugünün 5 vakti tamam, Allah kabul etsin'); },400); }
+  save(); renderPrayer();
+}
+$('#prayerBox').onclick = e => { const b=e.target.closest('[data-pn]'); if(b) togglePrayer(b.dataset.pn); };
+async function loadIlce(city, sel){
+  try{ const l=await (await fetch(`${EZAN}/ilceler/${encodeURIComponent(city)}`)).json();
+    $('#pIlce').innerHTML=l.map(x=>`<option value="${x.IlceID}" ${x.IlceID===sel?'selected':''}>${esc(x.IlceAdi)}</option>`).join(''); return l; }
+  catch(e){ $('#pIlce').innerHTML=`<option>${esc(S.prayer.place)}</option>`; return []; }
+}
+async function renderPrayerSettings(){
+  const P=S.prayer; $('#pOn').classList.toggle('on',P.on);
+  $('#pStatus').textContent = P.on ? `${P.place} · ${Object.keys(P.days).filter(k=>k>=today()).length} günlük vakit kayıtlı (Diyanet)` : 'Kapalı';
+  if(!citiesCache){ try{ citiesCache=await (await fetch(`${EZAN}/sehirler/2`)).json(); }catch(e){ citiesCache=null; } }
+  $('#pCity').innerHTML = citiesCache ? citiesCache.map(c=>`<option value="${c.SehirID}" ${c.SehirID===P.city?'selected':''}>${esc(c.SehirAdi)}</option>`).join('') : `<option>${esc(P.place)}</option>`;
+  await loadIlce(P.city, P.ilce);
+}
+const titleTr = s => s.split(' ').map(w=>w.charAt(0)+w.slice(1).toLocaleLowerCase('tr')).join(' ');
+function setIlce(id, name){ S.prayer.ilce=id; S.prayer.place=titleTr(name); S.prayer.err=false; save(); renderPrayer(); fetchPrayer(true).then(renderPrayerSettings); }
+$('#pOn').onclick = () => { S.prayer.on=!S.prayer.on; save(); renderPrayer(); renderPrayerSettings(); if(S.prayer.on) fetchPrayer(); };
+$('#pCity').onchange = async e => { S.prayer.city=e.target.value; const cname=e.target.selectedOptions[0].text; const l=await loadIlce(S.prayer.city);
+  const main=l.find(x=>x.IlceAdi===cname)||l[0]; if(main){ $('#pIlce').value=main.IlceID; setIlce(main.IlceID, main.IlceAdi); } };
+$('#pIlce').onchange = e => setIlce(e.target.value, e.target.selectedOptions[0].text);
+$('#pRefresh').onclick = () => fetchPrayer(true).then(renderPrayerSettings);
 
 // ---------- habits ----------
 function streakOf(h){
@@ -841,9 +945,10 @@ function finishPhase(skipped){
 function tick(){
   if(S.timer.running && leftNow()<=0) finishPhase(false);
   renderTimer();
+  const pm=new Date().getMinutes(); if(pm!==prayerMin){ prayerMin=pm; renderPrayer(); }
 }
 setInterval(tick, 500);
-document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ tick(); materializeRoutines(); applyFreezes(); renderAll(); maybeAutoSummary(); } });
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ tick(); materializeRoutines(); applyFreezes(); renderAll(); maybeAutoSummary(); fetchPrayer(); } });
 $('#tStart').onclick = () => {
   unlockAudio();
   if(S.timer.running){ S.timer.left=leftNow(); S.timer.running=false; }
@@ -900,7 +1005,7 @@ $('#wipe').onclick = () => { if(confirm('Tüm görevler, alışkanlıklar ve XP 
 function goTab(v){
   document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on', x.dataset.v===v));
   document.querySelectorAll('.view').forEach(x=>x.classList.toggle('on', x.id==='v-'+v));
-  if(v==='me'){ renderMe(); renderNotif(); }
+  if(v==='me'){ renderMe(); renderNotif(); renderPrayerSettings(); }
   if(v==='plan') renderPlan();
   window.scrollTo(0,0);
 }
@@ -940,12 +1045,12 @@ async function notify(title, body){
 }
 
 // ---------- init ----------
-function renderAll(){ renderTop(); showQuote(); renderTasks(); renderHabits(); renderSeg(); renderTimer(); renderStats(); renderMe(); renderPlan(); renderNotif(); }
+function renderAll(){ renderTop(); showQuote(); renderTasks(); renderHabits(); renderSeg(); renderTimer(); renderStats(); renderMe(); renderPlan(); renderNotif(); renderPrayer(); }
 // geçmiş: 30 günden eski tamamlanmış görevleri temizle
 const cut = dkey(addDays(new Date(),-30)); S.tasks = S.tasks.filter(t=>!t.done || t.doneOn>=cut); save();
 materializeRoutines(); applyFreezes(); renderAll(); checkBadges();
 if(new URLSearchParams(location.search).has('ozet')){ history.replaceState(null,'',location.pathname); openSummary(); } else maybeAutoSummary();
-writeSnap(); syncPush();
+writeSnap(); syncPush(); fetchPrayer();
 if('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e=>{ if(e.data==='ozet') openSummary(); });
 if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(()=>{});
 // ---------- otomatik güncelleme: yeni sürüm yayınlanınca uygulama kendini yeniler ----------
