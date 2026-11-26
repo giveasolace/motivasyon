@@ -77,6 +77,13 @@ h2{font-size:17px;margin:22px 0 10px}
 .heat{display:grid;grid-template-columns:repeat(30,1fr);gap:3px;margin-top:12px}
 .heat i{aspect-ratio:1;border-radius:3px;background:var(--line)}
 .heat i.on{background:var(--good)}
+.heat i.ice{background:#7cc4ff}
+.freeze{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:16px;padding:12px 14px;margin-bottom:14px;box-shadow:var(--shadow)}
+.freeze .fi{font-size:26px}
+.freeze .ft{flex:1;min-width:0;font-size:14px;color:var(--muted);line-height:1.35}
+.freeze .ft b{color:var(--text)}
+.freeze button{background:#3d8bff;color:#fff;border-radius:12px;padding:10px 12px;font-weight:700;font-size:13px;white-space:nowrap}
+.freeze button.off{opacity:.4}
 .heat i.today{outline:1.5px solid var(--accent);outline-offset:1px}
 
 /* focus */
@@ -164,6 +171,7 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:25;width:100%;heigh
     <h1>Alışkanlıklar</h1>
     <p class="sub">Zinciri kırma. Her gün küçük bir adım.</p>
     <form class="add" id="habitForm"><input id="habitIn" placeholder="Örn: 💧 2L su iç" autocomplete="off" enterkeyhint="done"><button aria-label="Ekle">+</button></form>
+    <div class="freeze"><div class="fi">❄️</div><div class="ft" id="frzTxt"></div><button id="frzBuy">100 XP ile al</button></div>
     <div class="card" id="habitList"></div>
   </section>
 
@@ -302,13 +310,15 @@ const BADGES = [
  ["s30","💎","30 gün seri", s=>maxStreak(s)>=30],
  ["l5","⭐","Seviye 5", s=>levelOf(s.xp).lvl>=5],
  ["l10","👑","Seviye 10", s=>levelOf(s.xp).lvl>=10],
- ["day5","🚀","Bir günde 5 görev", s=>Object.values(s.log).some(d=>(d.t||0)>=5)]
+ ["day5","🚀","Bir günde 5 görev", s=>Object.values(s.log).some(d=>(d.t||0)>=5)],
+ ["ice","🧊","İlk dondurucu", s=>(s.spent||0)>0]
 ];
 
 // ---------- state ----------
 const defaults = () => ({
   xp:0, tasks:[], habits:[], log:{}, // log[date] = {t:tasksDone, m:focusMin, p:pomos}
   stats:{tasks:0,pomos:0}, badges:[], bonus:{},
+  spent:0, freezes:0, frozen:{}, freezeChecked:null,
   focus:{work:25,brk:5}, timer:{mode:'work',running:false,endAt:0,left:25*60}, q:0
 });
 let S;
@@ -388,22 +398,51 @@ $('#taskList').onclick = e => {
 function streakOf(h){
   let n=0, d=new Date();
   if(!h.days[dkey(d)]) d=addDays(d,-1);
-  while(h.days[dkey(d)]){ n++; d=addDays(d,-1); }
+  for(let k=dkey(d); h.days[k] || S.frozen[k]; d=addDays(d,-1), k=dkey(d)){ if(h.days[k]) n++; }
   return n;
 }
+// ---------- streak freeze ----------
+const FREEZE_COST=100, FREEZE_MAX=2;
+const spendable = () => Math.max(0, S.xp-(S.spent||0));
+function applyFreezes(){
+  const y = dkey(addDays(new Date(),-1));
+  let d = S.freezeChecked ? addDays(new Date(S.freezeChecked+'T12:00'),1) : addDays(new Date(),-1);
+  const used=[];
+  for(let k=dkey(d); k<=y; d=addDays(d,1), k=dkey(d)){
+    const prev = dkey(addDays(d,-1));
+    const atRisk = S.habits.some(h => !h.days[k] && (h.days[prev] || S.frozen[prev]) );
+    if(atRisk && !S.frozen[k] && S.freezes>0){ S.freezes--; S.frozen[k]=true; used.push(k); }
+  }
+  S.freezeChecked = y; save();
+  if(used.length){
+    const names = used.map(k=>new Date(k+'T12:00').toLocaleDateString('tr-TR',{weekday:'long'})).join(', ');
+    modal('❄️','Serin korundu!',`${names} günü kaçırdın ama dondurucu serini kurtardı. Kalan dondurucu: ${S.freezes}`);
+  }
+}
+function renderFreeze(){
+  $('#frzTxt').innerHTML = `Dondurucu <b>${S.freezes}/${FREEZE_MAX}</b> · Harcanabilir <b>${spendable()} XP</b><br>Bir gün kaçırırsan serin bozulmaz.`;
+  $('#frzBuy').classList.toggle('off', S.freezes>=FREEZE_MAX || spendable()<FREEZE_COST);
+}
+$('#frzBuy').onclick = e => {
+  if(S.freezes>=FREEZE_MAX) return toast(`En fazla ${FREEZE_MAX} dondurucu taşıyabilirsin`);
+  if(spendable()<FREEZE_COST) return toast(`${FREEZE_COST-spendable()} XP daha lazım`);
+  S.spent=(S.spent||0)+FREEZE_COST; S.freezes++; save(); buzz();
+  const r=e.target.getBoundingClientRect(); confetti(60, r.left+r.width/2, r.top, ['#7cc4ff','#ffffff','#3d8bff','#bfe3ff']);
+  toast('❄️ Dondurucu alındı'); renderFreeze(); checkBadges();
+};
 function maxStreak(s){ return Math.max(0,...(s.habits||[]).map(h=>h.best||0)); }
 function renderHabits(){
   const t = today();
   $('#habitList').innerHTML = S.habits.length ? S.habits.map(h=>{
     const st = streakOf(h); let cells='';
-    for(let i=29;i>=0;i--){ const k=dkey(addDays(new Date(),-i)); cells+=`<i class="${h.days[k]?'on':''} ${i===0?'today':''}"></i>`; }
+    for(let i=29;i>=0;i--){ const k=dkey(addDays(new Date(),-i)); cells+=`<i class="${h.days[k]?'on':S.frozen[k]?'ice':''} ${i===0?'today':''}"></i>`; }
     return `<div class="habit" data-id="${h.id}">
       <div class="hhead">
         <div class="hname">${esc(h.name)}<div class="streak">${st?`🔥 <b>${st} gün</b> seri`:'Seri yok — bugün başla'} · en iyi ${h.best||0}</div></div>
         <button class="x" data-a="del" aria-label="Sil">×</button>
         <button class="hbtn ${h.days[t]?'on':''}" data-a="tog" aria-label="Bugün yaptım">${h.days[t]?'✓':'+'}</button>
       </div><div class="heat">${cells}</div></div>`;
-  }).join('') : `<div class="empty">Her gün yapmak istediğin bir şey ekle.<br>Örn: 📖 10 sayfa kitap, 🏃 20 dk yürüyüş</div>`;
+  }).join('') + (renderFreeze(),'') : (renderFreeze(),'') + `<div class="empty">Her gün yapmak istediğin bir şey ekle.<br>Örn: 📖 10 sayfa kitap, 🏃 20 dk yürüyüş</div>`;
 }
 $('#habitForm').onsubmit = e => {
   e.preventDefault(); const v=$('#habitIn').value.trim(); if(!v) return;
@@ -461,7 +500,7 @@ function tick(){
   renderTimer();
 }
 setInterval(tick, 500);
-document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ tick(); renderAll(); } });
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ tick(); applyFreezes(); renderAll(); } });
 $('#tStart').onclick = () => {
   unlockAudio();
   if(S.timer.running){ S.timer.left=leftNow(); S.timer.running=false; }
@@ -480,7 +519,7 @@ function renderStats(){
 function renderMe(){
   const days = Object.keys(S.log).filter(k=>S.log[k].t||S.log[k].p).length;
   const mins = Object.values(S.log).reduce((a,b)=>a+(b.m||0),0);
-  $('#meSub').textContent = `${S.xp} XP · ${S.stats.tasks} görev · ${Math.round(mins/60*10)/10} saat odak · ${days} aktif gün`;
+  $('#meSub').textContent = `${S.xp} XP (harcanabilir ${spendable()}) ·${S.stats.tasks} görev · ${Math.round(mins/60*10)/10} saat odak · ${days} aktif gün`;
   // chart
   const data=[]; for(let i=6;i>=0;i--){ const dt=addDays(new Date(),-i); const l=S.log[dkey(dt)]||{}; data.push({lbl:dt.toLocaleDateString('tr-TR',{weekday:'short'}), t:l.t||0, m:l.m||0}); }
   const mt=Math.max(1,...data.map(d=>d.t)), mm=Math.max(1,...data.map(d=>d.m));
@@ -531,9 +570,8 @@ $('#mOk').onclick = () => { $('#modal').classList.remove('show'); setTimeout(nex
 function buzz(p=30){ try{ navigator.vibrate && navigator.vibrate(p); }catch(e){} }
 
 const cv=$('#fx'), cx=cv.getContext('2d'); let parts=[], anim=false;
-function confetti(n=80, x=innerWidth/2, y=innerHeight/3){
+function confetti(n=80, x=innerWidth/2, y=innerHeight/3, cols=['#ff6a3d','#ffb23d','#22b573','#3d8bff','#c03dff','#ff3d7f']){
   cv.width=innerWidth*devicePixelRatio; cv.height=innerHeight*devicePixelRatio; cx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
-  const cols=['#ff6a3d','#ffb23d','#22b573','#3d8bff','#c03dff','#ff3d7f'];
   for(let i=0;i<n;i++){ const a=Math.random()*Math.PI*2, s=2+Math.random()*(n>100?9:5);
     parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-(n>100?6:3),r:3+Math.random()*4,c:cols[i%cols.length],rot:Math.random()*6,vr:(Math.random()-.5)*.4,life:1}); }
   if(!anim){ anim=true; requestAnimationFrame(step); }
@@ -561,7 +599,7 @@ async function notify(title, body){
 function renderAll(){ renderTop(); showQuote(); renderTasks(); renderHabits(); renderSeg(); renderTimer(); renderStats(); renderMe(); }
 // geçmiş: 30 günden eski tamamlanmış görevleri temizle
 const cut = dkey(addDays(new Date(),-30)); S.tasks = S.tasks.filter(t=>!t.done || t.doneOn>=cut); save();
-renderAll(); checkBadges();
+applyFreezes(); renderAll(); checkBadges();
 if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(()=>{});
 })();
 </script>
