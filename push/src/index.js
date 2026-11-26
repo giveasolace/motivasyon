@@ -76,8 +76,6 @@ async function prices(syms) {
   return out;
 }
 
-import { handleStatement } from './statement.js';
-
 export function isDue(p, h, day) {
   if (p.app === 'cuzdan') return p.hour === h && (p.dates || []).includes(day);
   return ['sum', 'morn', 'mid'].some(t => p.on?.[t] && p[t] === h);
@@ -115,7 +113,6 @@ export default {
       await env.SUBS.put(await keyOf(sub.endpoint), JSON.stringify({ sub: { endpoint: sub.endpoint, keys: sub.keys }, prefs, at: Date.now() }));
       return json({ ok: true }, 200, o);
     }
-    if (path === '/statement') return handleStatement(body, env, (d, st) => json(d, st, o));
     if (path === '/unsubscribe') {
       if (body.endpoint) await env.SUBS.delete(await keyOf(body.endpoint));
       return json({ ok: true }, 200, o);
