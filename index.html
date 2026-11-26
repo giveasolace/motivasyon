@@ -948,6 +948,13 @@ if(new URLSearchParams(location.search).has('ozet')){ history.replaceState(null,
 writeSnap(); syncPush();
 if('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e=>{ if(e.data==='ozet') openSummary(); });
 if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(()=>{});
+// ---------- otomatik güncelleme: yeni sürüm yayınlanınca uygulama kendini yeniler ----------
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  const hadCtl = !!navigator.serviceWorker.controller; let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if(hadCtl && !reloading){ reloading = true; location.reload(); } });
+  navigator.serviceWorker.getRegistration().then(reg => { if(!reg) return;
+    document.addEventListener('visibilitychange', () => { if(!document.hidden) reg.update().catch(()=>{}); }); });
+}
 })();
 </script>
 </body>

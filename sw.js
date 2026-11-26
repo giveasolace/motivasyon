@@ -1,4 +1,4 @@
-const CACHE = 'motive-v4';
+const CACHE = 'motive-v5';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -11,7 +11,7 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET' || !e.request.url.startsWith(self.location.origin)) return;
   e.respondWith(
-    fetch(e.request).then(r => {
+    fetch(e.request.url, { cache: 'no-cache', credentials: 'same-origin' }).then(r => {  // HTTP önbelleğini atla, hep en yeni sürüm
       const copy = r.clone();
       caches.open(CACHE).then(c => c.put(e.request, copy));
       return r;
